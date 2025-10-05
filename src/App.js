@@ -32,7 +32,7 @@ function App() {
   const [logs, setLogs] = useState([]);
   const [boats, setBoats] = useState([]);
   const websocketRef = useRef(null);
-  const [wsIp, setWsIp] = useState(""); // Default IP
+  const [wsBoatId, setWsBoatId] = useState(""); // Default Boat ID
 
   useEffect(() => {
     fetch("http://localhost:3001/api/boats")
@@ -40,7 +40,7 @@ function App() {
       .then((data) => {
         setBoats(data);
         if (data.length > 0) {
-          setWsIp(data[0].ip);
+          setWsBoatId(data[0].boatId);
         }
       })
       .catch((err) => console.error("Error fetching boats:", err));
@@ -52,12 +52,14 @@ function App() {
 
   // Setup WebSocket
   useEffect(() => {
-    const ws = new WebSocket(wsIp); // Use the IP from the state
+    if (!wsBoatId) return; // Do not connect if no boat is selected
+
+    const ws = new WebSocket(`ws://localhost:8000/${wsBoatId}`); // Use the Boat ID in the URL
     websocketRef.current = ws;
 
     ws.onopen = () => {
-      console.log("WebSocket connection opened");
-      appendLog("WebSocket connection established!");
+      console.log(`WebSocket connection opened for boat ${wsBoatId}`);
+      appendLog(`WebSocket connection established for boat ${wsBoatId}!`);
     };
 
     ws.onmessage = (event) => {
@@ -95,7 +97,7 @@ function App() {
         ws.close();
       }
     };
-  }, [appendLog, wsIp]);
+  }, [appendLog, wsBoatId]);
 
   const sendDataToWebSocket = useCallback(
     (dataToSend) => {
@@ -120,7 +122,11 @@ function App() {
       <Navbar />
       <div className="app-container">
         <div className="websocket-configurator">
-          <WebSocketConfigurator boats={boats} setWsIp={setWsIp} currentWsIp={wsIp} />
+          <WebSocketConfigurator
+            boats={boats}
+            setWsBoatId={setWsBoatId}
+            currentWsBoatId={wsBoatId}
+          />
         </div>
         <TelemetryPanel
           data={{
@@ -135,7 +141,7 @@ function App() {
         />
         <MapComponent
           lat={telemetry.lat}
-          lon={telemetry.lon}
+          lon={ telemetry.lon}
           currentHead={telemetry.head}
           targetHead={telemetry.targetHead}
         />

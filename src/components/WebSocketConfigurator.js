@@ -1,17 +1,17 @@
 import React, { useState, useEffect } from "react";
 
-function WebSocketConfigurator({ boats, setWsIp, currentWsIp }) {
-  const [selectedIp, setSelectedIp] = useState(currentWsIp);
+function WebSocketConfigurator({ boats, setWsBoatId, currentWsBoatId }) {
+  const [selectedBoatId, setSelectedBoatId] = useState(currentWsBoatId);
 
   useEffect(() => {
-    setSelectedIp(currentWsIp);
-  }, [currentWsIp]);
+    setSelectedBoatId(currentWsBoatId);
+  }, [currentWsBoatId]);
 
-  const handleSelectIp = (event) => {
-    const newIp = event.target.value;
-    setSelectedIp(newIp);
-    setWsIp(newIp);
-    console.log(`Selected IP: ${newIp}`); // Log the selected IP
+  const handleSelectBoat = (event) => {
+    const newBoatId = event.target.value;
+    setSelectedBoatId(newBoatId);
+    setWsBoatId(newBoatId);
+    console.log(`Selected Boat ID: ${newBoatId}`); // Log the selected Boat ID
   };
 
   return (
@@ -23,15 +23,15 @@ function WebSocketConfigurator({ boats, setWsIp, currentWsIp }) {
       }}
     >
       <label
-        htmlFor="ipSelect"
+        htmlFor="boatIdSelect"
         style={{ marginRight: "5px", fontSize: "0.8em" }}
       >
         Select Boat:
       </label>
       <select
-        id="ipSelect"
-        value={selectedIp}
-        onChange={handleSelectIp}
+        id="boatIdSelect"
+        value={selectedBoatId}
+        onChange={handleSelectBoat}
         style={{
           padding: "5px",
           borderRadius: "3px",
@@ -41,8 +41,8 @@ function WebSocketConfigurator({ boats, setWsIp, currentWsIp }) {
         }}
       >
         {boats.map((boat) => (
-          <option key={boat.id} value={boat.ip}>
-            {boat.name} ({boat.ip})
+          <option key={boat.id} value={boat.boatId}>
+            {boat.name} ({boat.boatId})
           </option>
         ))}
       </select>

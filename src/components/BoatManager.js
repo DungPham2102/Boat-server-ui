@@ -3,7 +3,7 @@ import React, { useState } from "react";
 function BoatManager({ boats, setBoats }) {
   const [isEditing, setIsEditing] = useState(false);
   const [currentBoat, setCurrentBoat] = useState(null);
-  const [formData, setFormData] = useState({ name: "", ip: "" });
+  const [formData, setFormData] = useState({ name: "", boatId: "" });
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -19,7 +19,7 @@ function BoatManager({ boats, setBoats }) {
       .then((res) => res.json())
       .then((newBoat) => {
         setBoats([...boats, newBoat]);
-        setFormData({ name: "", ip: "" });
+        setFormData({ name: "", boatId: "" });
       });
   };
 
@@ -34,7 +34,7 @@ function BoatManager({ boats, setBoats }) {
         setBoats(boats.map((b) => (b.id === updatedBoat.id ? updatedBoat : b)));
         setIsEditing(false);
         setCurrentBoat(null);
-        setFormData({ name: "", ip: "" });
+        setFormData({ name: "", boatId: "" });
       });
   };
 
@@ -49,7 +49,7 @@ function BoatManager({ boats, setBoats }) {
   const handleEditClick = (boat) => {
     setIsEditing(true);
     setCurrentBoat(boat);
-    setFormData({ name: boat.name, ip: boat.ip });
+    setFormData({ name: boat.name, boatId: boat.boatId });
   };
 
   const handleSubmit = (e) => {
@@ -75,9 +75,9 @@ function BoatManager({ boats, setBoats }) {
         />
         <input
           type="text"
-          name="ip"
-          placeholder="IP Address"
-          value={formData.ip}
+          name="boatId"
+          placeholder="Boat ID"
+          value={formData.boatId}
           onChange={handleInputChange}
           required
         />
@@ -88,7 +88,7 @@ function BoatManager({ boats, setBoats }) {
             onClick={() => {
               setIsEditing(false);
               setCurrentBoat(null);
-              setFormData({ name: "", ip: "" });
+              setFormData({ name: "", boatId: "" });
             }}
           >
             Cancel
@@ -99,7 +99,7 @@ function BoatManager({ boats, setBoats }) {
         <thead>
           <tr>
             <th>Name</th>
-            <th>IP Address</th>
+            <th>Boat ID</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -107,7 +107,7 @@ function BoatManager({ boats, setBoats }) {
           {boats.map((boat) => (
             <tr key={boat.id}>
               <td>{boat.name}</td>
-              <td>{boat.ip}</td>
+              <td>{boat.boatId}</td>
               <td className="boat-manager-actions">
                 <button onClick={() => handleEditClick(boat)}>Edit</button>
                 <button onClick={() => handleDelete(boat.id)}>Delete</button>
