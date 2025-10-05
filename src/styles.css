@@ -1,0 +1,119 @@
+body {
+  background-color: #273238;
+  color: #bbbbbb;
+  margin: 0;
+  font-family: sans-serif; /* Added for better default */
+}
+
+#map {
+  height: 660px;
+  width: 640px;
+  overflow: hidden;
+  margin-bottom: 20px;
+  border-radius: 5px;
+}
+
+.panel {
+  flex: 1;
+  margin: 10px;
+  background-color: #303f46;
+  padding: 20px; /* Increased padding */
+  border-radius: 5px;
+  min-width: 250px; /* Ensure panels don't get too small */
+}
+
+/* Ensure Leaflet controls are hidden if desired */
+.leaflet-control-container {
+  display: none;
+}
+
+.app-container {
+  /* Renamed from .container for clarity */
+  display: flex;
+  margin: 0 auto;
+  width: 90%;
+  max-width: 1400px; /* Set a max width */
+  justify-content: space-between;
+  flex-wrap: wrap; /* Allow wrapping on smaller screens */
+}
+
+.websocket-configurator {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 10px;
+  background: #303f46;
+  border-radius: 5px;
+  margin-bottom: 10px;
+  width: 100%;
+  box-sizing: border-box; /* Ensure padding doesn't affect width */
+}
+
+.radar-line {
+  animation: blink 1s infinite;
+}
+
+.form-group {
+  margin-bottom: 15px; /* Increased margin */
+}
+
+.navbar {
+  margin-bottom: 20px;
+}
+
+.console-container {
+  /* Renamed from .console */
+  width: 90%;
+  max-width: 1400px; /* Match app-container */
+  margin: 20px auto; /* Added top margin */
+}
+
+.direction-icon {
+  font-size: 20px;
+  color: rgb(201, 12, 12);
+  font-weight: bold;
+}
+
+#console-textarea {
+  /* Specific ID for textarea */
+  height: 150px;
+  background-color: #1e2529;
+  color: #bbbbbb;
+  border: 1px solid #444; /* Added border */
+  border-radius: 5px;
+  width: 100%; /* Ensure full width */
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+/* Add labels for better styling */
+label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: bold;
+}
+
+/* Style inputs */
+input[type="text"] {
+  background-color: #1e2529;
+  color: #bbbbbb;
+  border: 1px solid #444;
+}
+
+input[type="text"]:read-only {
+  background-color: #2a343a;
+  cursor: not-allowed;
+}
+
+/* Center navbar content better */
+.navbar-content {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.navbar-center {
+  flex-grow: 1;
+  text-align: center;
+}
