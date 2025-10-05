@@ -117,3 +117,48 @@ input[type="text"]:read-only {
   flex-grow: 1;
   text-align: center;
 }
+
+/* Boat Manager Styles */
+.boat-manager-container {
+  background-color: #303f46;
+  padding: 20px;
+  border-radius: 5px;
+  margin: 10px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.boat-manager-form {
+  display: flex;
+  margin-bottom: 20px;
+}
+
+.boat-manager-form input {
+  flex-grow: 1;
+  margin-right: 10px;
+  padding: 8px;
+}
+
+.boat-manager-form button {
+  padding: 8px 12px;
+}
+
+.boat-manager-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.boat-manager-table th,
+.boat-manager-table td {
+  border: 1px solid #444;
+  padding: 8px;
+  text-align: left;
+}
+
+.boat-manager-table th {
+  background-color: #1e2529;
+}
+
+.boat-manager-actions button {
+  margin-right: 5px;
+}

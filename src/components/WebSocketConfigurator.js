@@ -1,21 +1,11 @@
-import React, { useState } from "react";
-import ipList from "../ipList"; // Import the IP list
+import React, { useState, useEffect } from "react";
 
-function WebSocketConfigurator({ setWsIp, currentWsIp }) {
-  const [ipInput, setIpInput] = useState("");
-  const [availableIps, setAvailableIps] = useState(ipList); // Use the imported IP list
+function WebSocketConfigurator({ boats, setWsIp, currentWsIp }) {
   const [selectedIp, setSelectedIp] = useState(currentWsIp);
 
-  const handleIpChange = (event) => {
-    setIpInput(event.target.value);
-  };
-
-  const handleAddIp = () => {
-    if (ipInput && !availableIps.includes(ipInput)) {
-      setAvailableIps([...availableIps, ipInput]);
-      setIpInput("");
-    }
-  };
+  useEffect(() => {
+    setSelectedIp(currentWsIp);
+  }, [currentWsIp]);
 
   const handleSelectIp = (event) => {
     const newIp = event.target.value;
@@ -36,7 +26,7 @@ function WebSocketConfigurator({ setWsIp, currentWsIp }) {
         htmlFor="ipSelect"
         style={{ marginRight: "5px", fontSize: "0.8em" }}
       >
-        Select IP:
+        Select Boat:
       </label>
       <select
         id="ipSelect"
@@ -50,40 +40,12 @@ function WebSocketConfigurator({ setWsIp, currentWsIp }) {
           fontSize: "0.8em",
         }}
       >
-        {availableIps.map((ip) => (
-          <option key={ip} value={ip}>
-            {ip}
+        {boats.map((boat) => (
+          <option key={boat.id} value={boat.ip}>
+            {boat.name} ({boat.ip})
           </option>
         ))}
       </select>
-      <input
-        type="text"
-        placeholder="Add New IP"
-        value={ipInput}
-        onChange={handleIpChange}
-        style={{
-          padding: "5px",
-          borderRadius: "3px",
-          border: "1px solid #ced4da",
-          marginRight: "5px",
-          fontSize: "0.8em",
-          width: "120px",
-        }}
-      />
-      <button
-        onClick={handleAddIp}
-        style={{
-          padding: "5px 8px",
-          backgroundColor: "#28a745",
-          color: "white",
-          border: "none",
-          borderRadius: "3px",
-          cursor: "pointer",
-          fontSize: "0.8em",
-        }}
-      >
-        Add IP
-      </button>
     </div>
   );
 }

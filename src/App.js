@@ -4,8 +4,8 @@ import TelemetryPanel from "./components/TelemetryPanel";
 import ControlPanel from "./components/ControlPanel";
 import MapComponent from "./components/MapComponent";
 import Console from "./components/Console";
-import WebSocketConfigurator from "./components/WebSocketConfigurator"; // Import the new component
-import ipList from "./ipList";
+import WebSocketConfigurator from "./components/WebSocketConfigurator";
+import BoatManager from "./components/BoatManager"; // Import the new component
 import "./styles.css";
 
 function App() {
@@ -30,8 +30,21 @@ function App() {
   });
 
   const [logs, setLogs] = useState([]);
+  const [boats, setBoats] = useState([]);
   const websocketRef = useRef(null);
-  const [wsIp, setWsIp] = useState(ipList[0]); // Default IP
+  const [wsIp, setWsIp] = useState(""); // Default IP
+
+  useEffect(() => {
+    fetch("http://localhost:3001/api/boats")
+      .then((res) => res.json())
+      .then((data) => {
+        setBoats(data);
+        if (data.length > 0) {
+          setWsIp(data[0].ip);
+        }
+      })
+      .catch((err) => console.error("Error fetching boats:", err));
+  }, []);
 
   const appendLog = useCallback((msg) => {
     setLogs((prev) => [...prev, `${new Date().toLocaleTimeString()}: ${msg}`]);
@@ -107,7 +120,7 @@ function App() {
       <Navbar />
       <div className="app-container">
         <div className="websocket-configurator">
-          <WebSocketConfigurator setWsIp={setWsIp} currentWsIp={wsIp} />
+          <WebSocketConfigurator boats={boats} setWsIp={setWsIp} currentWsIp={wsIp} />
         </div>
         <TelemetryPanel
           data={{
@@ -127,6 +140,7 @@ function App() {
           targetHead={telemetry.targetHead}
         />
         <ControlPanel initialData={controls} onSend={sendDataToWebSocket} />
+        <BoatManager boats={boats} setBoats={setBoats} />
       </div>
       <Console logs={logs} />
     </div>
