@@ -15,16 +15,10 @@ function WebSocketConfigurator({ boats, setWsBoatId, currentWsBoatId }) {
   };
 
   return (
-    <div
-      className="websocket-configurator"
-      style={{
-        display: "flex",
-        alignItems: "center",
-      }}
-    >
+    <React.Fragment>
       <label
         htmlFor="boatIdSelect"
-        style={{ marginRight: "5px", fontSize: "0.8em" }}
+        style={{ marginRight: "5px", fontSize: "0.8em", whiteSpace: "nowrap" }}
       >
         Select Boat:
       </label>
@@ -46,7 +40,7 @@ function WebSocketConfigurator({ boats, setWsBoatId, currentWsBoatId }) {
           </option>
         ))}
       </select>
-    </div>
+    </React.Fragment>
   );
 }
 

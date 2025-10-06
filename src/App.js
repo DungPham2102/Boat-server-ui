@@ -19,23 +19,22 @@ function App() {
     pid: 0,
   });
 
-  const [controls, setControls] = useState({
-    mode: 0,
-    speed: 1500,
-    targetLat: 21.68942656,
-    targetLon: 102.09262948,
-    kp: 1.0,
-    ki: 0.1,
-    kd: 0.05,
-  });
-
   const [logs, setLogs] = useState([]);
   const [boats, setBoats] = useState([]);
   const websocketRef = useRef(null);
   const [wsBoatId, setWsBoatId] = useState(""); // Default Boat ID
+  const [serverIp, setServerIp] = useState("localhost"); // Default Server IP
+  const [ipInput, setIpInput] = useState("localhost"); // IP input field
+
+  const handleConnect = () => {
+    setServerIp(ipInput);
+  };
 
   useEffect(() => {
-    fetch("http://localhost:3001/api/boats")
+    if (!serverIp) return; // Do not fetch if no server IP is provided
+
+    // Fetch boats from the database
+    fetch(`http://${serverIp}:3001/api/boats`)
       .then((res) => res.json())
       .then((data) => {
         setBoats(data);
@@ -43,8 +42,11 @@ function App() {
           setWsBoatId(data[0].boatId);
         }
       })
-      .catch((err) => console.error("Error fetching boats:", err));
-  }, []);
+      .catch((err) => {
+        console.error("Error fetching boats:", err);
+        setBoats([]); // Clear boats on error
+      });
+  }, [serverIp]);
 
   const appendLog = useCallback((msg) => {
     setLogs((prev) => [...prev, `${new Date().toLocaleTimeString()}: ${msg}`]);
@@ -52,52 +54,57 @@ function App() {
 
   // Setup WebSocket
   useEffect(() => {
-    if (!wsBoatId) return; // Do not connect if no boat is selected
+    if (!wsBoatId || !serverIp) return; // Do not connect if no boat or server IP is selected
 
-    const ws = new WebSocket(`ws://localhost:8000/${wsBoatId}`); // Use the Boat ID in the URL
-    websocketRef.current = ws;
+    try {
+      const ws = new WebSocket(`ws://${serverIp}:8000/${wsBoatId}`); // Use the Server IP and Boat ID in the URL
+      websocketRef.current = ws;
 
-    ws.onopen = () => {
-      console.log(`WebSocket connection opened for boat ${wsBoatId}`);
-      appendLog(`WebSocket connection established for boat ${wsBoatId}!`);
-    };
+      ws.onopen = () => {
+        console.log(`WebSocket connection opened for boat ${wsBoatId}`);
+        appendLog(`WebSocket connection established for boat ${wsBoatId}!`);
+      };
 
-    ws.onmessage = (event) => {
-      console.log("Received message:", event.data);
-      const data = event.data.split(",");
+      ws.onmessage = (event) => {
+        console.log("Received message:", event.data);
+        const data = event.data.split(",");
 
-      setTelemetry((prev) => ({
-        ...prev, // Keep old values if new data is missing
-        lat: parseFloat(data[0]) || prev.lat,
-        lon: parseFloat(data[1]) || prev.lon,
-        head: parseFloat(data[2]) || prev.head,
-        targetHead: parseFloat(data[3]) || prev.targetHead,
-        leftSpeed: parseInt(data[4]) || prev.leftSpeed,
-        rightSpeed: parseInt(data[5]) || prev.rightSpeed,
-        pid: parseFloat(data[6]) || prev.pid,
-      }));
-      appendLog(`Data received: ${event.data}`);
-    };
+        setTelemetry((prev) => ({
+          ...prev, // Keep old values if new data is missing
+          lat: parseFloat(data[0]) || prev.lat,
+          lon: parseFloat(data[1]) || prev.lon,
+          head: parseFloat(data[2]) || prev.head,
+          targetHead: parseFloat(data[3]) || prev.targetHead,
+          leftSpeed: parseInt(data[4]) || prev.leftSpeed,
+          rightSpeed: parseInt(data[5]) || prev.rightSpeed,
+          pid: parseFloat(data[6]) || prev.pid,
+        }));
+        appendLog(`Data received: ${event.data}`);
+      };
 
-    ws.onclose = () => {
-      console.log("WebSocket connection closed");
-      appendLog("Connection closed!");
-      websocketRef.current = null;
-    };
+      ws.onclose = () => {
+        console.log("WebSocket connection closed");
+        appendLog("Connection closed!");
+        websocketRef.current = null;
+      };
 
-    ws.onerror = (error) => {
-      console.error("WebSocket error:", error);
-      appendLog("Error in connection!");
-      websocketRef.current = null;
-    };
+      ws.onerror = (error) => {
+        console.error("WebSocket error:", error);
+        appendLog("Error in connection!");
+        websocketRef.current = null;
+      };
 
-    // Cleanup on component unmount
-    return () => {
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.close();
-      }
-    };
-  }, [appendLog, wsBoatId]);
+      // Cleanup on component unmount
+      return () => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.close();
+        }
+      };
+    } catch (error) {
+      console.error("WebSocket construction error:", error);
+      appendLog("Invalid Server IP format.");
+    }
+  }, [appendLog, wsBoatId, serverIp]);
 
   const sendDataToWebSocket = useCallback(
     (dataToSend) => {
@@ -122,11 +129,48 @@ function App() {
       <Navbar />
       <div className="app-container">
         <div className="websocket-configurator">
-          <WebSocketConfigurator
-            boats={boats}
-            setWsBoatId={setWsBoatId}
-            currentWsBoatId={wsBoatId}
-          />
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              marginBottom: "10px",
+            }}
+          >
+            <label
+              htmlFor="serverIpInput"
+              style={{ marginRight: "5px", fontSize: "0.8em" }}
+            >
+              Server IP:
+            </label>
+            <input
+              id="serverIpInput"
+              type="text"
+              value={ipInput}
+              onChange={(e) => setIpInput(e.target.value)}
+              style={{
+                padding: "5px",
+                borderRadius: "3px",
+                border: "1px solid #ced4da",
+                marginRight: "10px",
+                fontSize: "0.8em",
+              }}
+            />
+            <button
+              onClick={handleConnect}
+              style={{
+                fontSize: "0.8em",
+                padding: "5px 10px",
+                marginRight: "10px",
+              }}
+            >
+              Connect
+            </button>
+            <WebSocketConfigurator
+              boats={boats}
+              setWsBoatId={setWsBoatId}
+              currentWsBoatId={wsBoatId}
+            />
+          </div>
         </div>
         <TelemetryPanel
           data={{
@@ -141,11 +185,22 @@ function App() {
         />
         <MapComponent
           lat={telemetry.lat}
-          lon={ telemetry.lon}
+          lon={telemetry.lon}
           currentHead={telemetry.head}
           targetHead={telemetry.targetHead}
         />
-        <ControlPanel initialData={controls} onSend={sendDataToWebSocket} />
+        <ControlPanel
+          initialData={{
+            mode: 0,
+            speed: 1500,
+            targetLat: 21.68942656,
+            targetLon: 102.09262948,
+            kp: 1.0,
+            ki: 0.1,
+            kd: 0.05,
+          }}
+          onSend={sendDataToWebSocket}
+        />
         <BoatManager boats={boats} setBoats={setBoats} />
       </div>
       <Console logs={logs} />
