@@ -24,7 +24,7 @@ const MapComponent = ({ lat, lon, currentHead, targetHead }) => {
   const center = [lat, lon];
 
   // Function to calculate a point given an angle and radius
-  const rotateLine = (angle, centerCoord) => {
+  const rotateLine = useCallback((angle, centerCoord) => {
     const radius = 75 / 111000;
 
     // centerCoord là một mảng [lat, lon]
@@ -42,7 +42,7 @@ const MapComponent = ({ lat, lon, currentHead, targetHead }) => {
     const newLon = currentLon + radius * Math.sin(angleRad);
 
     return [newLat, newLon];
-  };
+  }, []);
 
   // Function to draw radar circles
   const drawCircles = useCallback((map, centerCoord) => {
@@ -101,13 +101,13 @@ const MapComponent = ({ lat, lon, currentHead, targetHead }) => {
         // @ts-ignore
         center: center,
         zoom: 19, // Adjusted zoom
-        scrollWheelZoom: false,
-        touchZoom: false,
-        zoomControl: false,
-        dragging: false,
-        doubleClickZoom: false,
-        boxZoom: false,
-        keyboard: false,
+        scrollWheelZoom: true,
+        touchZoom: true,
+        zoomControl: true,
+        dragging: true,
+        doubleClickZoom: true,
+        boxZoom: true,
+        keyboard: true,
       });
 
       L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -171,7 +171,7 @@ const MapComponent = ({ lat, lon, currentHead, targetHead }) => {
         mapRef.current = null;
       }
     };
-  }, []); // Empty dependency array ensures this runs only once
+  }, [center, drawCircles, updateHeadingLines, rotateLine]);
 
   // Update Boat Position & Map View
   useEffect(() => {
@@ -179,12 +179,10 @@ const MapComponent = ({ lat, lon, currentHead, targetHead }) => {
     if (mapRef.current && boatMarkerRef.current) {
       // @ts-ignore
       boatMarkerRef.current.setLatLng(center);
-      // @ts-ignore
-      mapRef.current.panTo(center);
       drawCircles(mapRef.current, center);
       updateHeadingLines(mapRef.current, center);
     }
-  }, [lat, lon, currentHead, targetHead]);
+  }, [lat, lon, currentHead, targetHead, drawCircles, updateHeadingLines]);
 
   return <div id="map"></div>;
 };
