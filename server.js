@@ -98,53 +98,75 @@ app.listen(port, () => {
 // WebSocket server for telemetry data
 const wss = new WebSocket.Server({ port: 8000 });
 
-const boatConnections = new Map();
+// --- New WebSocket Logic ---
+// Key: boatId (string), Value: Set of WebSocket clients (UIs)
+const clientsByBoatId = new Map();
+
+console.log("WebSocket server started on port 8000. Waiting for connections...");
 
 wss.on("connection", (ws, req) => {
-  const boatId = req.url.substring(1); // Get boatId from URL, e.g., /boat123
+  const path = req.url;
+  const boatId = path.substring(1);
 
-  if (!boatId) {
-    console.log("Connection attempt without boatId. Closing.");
-    ws.close();
-    return;
+  // If the URL has a boatId, it's a UI client subscribing for data.
+  if (boatId) {
+    console.log(`UI client connected, subscribing to boat: ${boatId}`);
+    if (!clientsByBoatId.has(boatId)) {
+      clientsByBoatId.set(boatId, new Set());
+    }
+    clientsByBoatId.get(boatId).add(ws);
+
+    ws.on("close", () => {
+      console.log(`UI client for boat ${boatId} disconnected`);
+      clientsByBoatId.get(boatId).delete(ws);
+    });
+
+    ws.on("error", (error) => {
+      console.error(`WebSocket error for UI client (boat ${boatId}):`, error);
+      clientsByBoatId.get(boatId).delete(ws);
+    });
+
+  } else {
+    // If the URL is empty, it's a data source (our Python script).
+    console.log("Data source connected.");
+
+    ws.on('message', (message) => {
+        const messageString = message.toString();
+        
+        // Data format from Python script: "boat_id,lat,lon,..."
+        const parts = messageString.split(',');
+        if (parts.length < 2) {
+            console.log(`Invalid data format from source: ${messageString}. Skipping.`);
+            return;
+        }
+        const receivedBoatId = parts[0];
+
+        // Find all UI clients subscribed to this boatId
+        const subscribers = clientsByBoatId.get(receivedBoatId);
+        if (subscribers && subscribers.size > 0) {
+            console.log(`Broadcasting data for boat ${receivedBoatId} to ${subscribers.size} subscribers.`);
+            subscribers.forEach(client => {
+                if (client.readyState === WebSocket.OPEN) {
+                    // The UI expects the full data string
+                    client.send(messageString);
+                }
+            });
+        } else {
+            // This is normal if no UI is currently watching this boat
+            // console.log(`No subscribers found for boat ${receivedBoatId}.`);
+        }
+    });
+
+    ws.on('close', () => {
+        console.log('Data source disconnected.');
+    });
+
+    ws.on('error', (error) => {
+        console.error('WebSocket error for data source:', error);
+    });
   }
-
-  console.log(`Client connected for boat: ${boatId}`);
-  boatConnections.set(boatId, ws);
-
-  ws.on("message", (message) => {
-    console.log(`Received from ${boatId}: ${message}`);
-    // Here you can process messages sent from the UI to the boat
-  });
-
-  ws.on("close", () => {
-    console.log(`Client disconnected for boat: ${boatId}`);
-    boatConnections.delete(boatId);
-  });
-
-  ws.on("error", (error) => {
-    console.error(`WebSocket error for boat ${boatId}:`, error);
-  });
 });
 
-// This is a placeholder for your LoRa data reception logic.
-// You would replace this with your actual serial port or other LoRa data source.
-function simulateLoRaData() {
-  setInterval(() => {
-    // Example: "boat123,21.038,105.782,15,90,1500,1500,0.5"
-    const boatId = `boat${Math.floor(Math.random() * 3) + 1}`;
-    const lat = 21.038 + (Math.random() - 0.5) * 0.01;
-    const lon = 105.782 + (Math.random() - 0.5) * 0.01;
-    const data = `${lat.toFixed(6)},${lon.toFixed(6)},${(Math.random() * 360).toFixed(0)},90,1500,1500,0.5`;
-
-    const ws = boatConnections.get(boatId);
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(data);
-      console.log(`Sent data to boat ${boatId}: ${data}`);
-    } else {
-      console.log(`No active WebSocket connection for boat ${boatId}`);
-    }
-  }, 2000); // Send data every 2 seconds
-}
-
-simulateLoRaData(); // Start the simulation
+// The old simulation logic is now replaced by the Python script.
+// function simulateLoRaData() { ... }
+// simulateLoRaData();
