@@ -80,7 +80,6 @@ function App() {
             leftSpeed: parseInt(data[5]) || prev.leftSpeed,
             rightSpeed: parseInt(data[6]) || prev.rightSpeed,
             pid: parseFloat(data[7]) || prev.pid,
-            // pid is not in the demo client data, so we don't update it here
           }));
         }
         appendLog(`Data received: ${event.data}`);

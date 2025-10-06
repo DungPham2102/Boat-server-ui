@@ -1,5 +1,5 @@
 // @ts-ignore
-import React, { useEffect, useRef, useCallback } from "react";
+import React, { useEffect, useRef, useCallback, useMemo } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -21,7 +21,7 @@ const MapComponent = ({ lat, lon, currentHead, targetHead }) => {
   const radarLinesRef = useRef(/** @type {L.Polyline[]} */ ([]));
   const animationFrameRef = useRef(null); // To control animation frame
 
-  const center = [lat, lon];
+  const center = useMemo(() => [lat, lon], [lat, lon]);
 
   // Function to calculate a point given an angle and radius
   const rotateLine = useCallback((angle, centerCoord) => {
@@ -175,12 +175,11 @@ const MapComponent = ({ lat, lon, currentHead, targetHead }) => {
 
   // Update Boat Position & Map View
   useEffect(() => {
-    const center = [lat, lon];
     if (mapRef.current && boatMarkerRef.current) {
       // @ts-ignore
-      boatMarkerRef.current.setLatLng(center);
-      drawCircles(mapRef.current, center);
-      updateHeadingLines(mapRef.current, center);
+      boatMarkerRef.current.setLatLng([lat, lon]);
+      drawCircles(mapRef.current, [lat, lon]);
+      updateHeadingLines(mapRef.current, [lat, lon]);
     }
   }, [lat, lon, currentHead, targetHead, drawCircles, updateHeadingLines]);
 
