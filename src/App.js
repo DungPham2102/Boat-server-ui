@@ -69,16 +69,20 @@ function App() {
         console.log("Received message:", event.data);
         const data = event.data.split(",");
 
-        setTelemetry((prev) => ({
-          ...prev, // Keep old values if new data is missing
-          lat: parseFloat(data[0]) || prev.lat,
-          lon: parseFloat(data[1]) || prev.lon,
-          head: parseFloat(data[2]) || prev.head,
-          targetHead: parseFloat(data[3]) || prev.targetHead,
-          leftSpeed: parseInt(data[4]) || prev.leftSpeed,
-          rightSpeed: parseInt(data[5]) || prev.rightSpeed,
-          pid: parseFloat(data[6]) || prev.pid,
-        }));
+        // Data format: BOAT_ID,lat,lon,current_head,target_head,left_speed,right_speed
+        if (data.length >= 7) {
+          setTelemetry((prev) => ({
+            ...prev,
+            lat: parseFloat(data[1]) || prev.lat,
+            lon: parseFloat(data[2]) || prev.lon,
+            head: parseFloat(data[3]) || prev.head,
+            targetHead: parseFloat(data[4]) || prev.targetHead,
+            leftSpeed: parseInt(data[5]) || prev.leftSpeed,
+            rightSpeed: parseInt(data[6]) || prev.rightSpeed,
+            pid: parseFloat(data[7]) || prev.pid,
+            // pid is not in the demo client data, so we don't update it here
+          }));
+        }
         appendLog(`Data received: ${event.data}`);
       };
 
