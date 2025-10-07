@@ -171,10 +171,15 @@ const MapComponent = ({ lat, lon, currentHead, targetHead, recenter }) => {
 
   // Recenter map
   useEffect(() => {
-    if (mapRef.current) {
+    // This effect is intentionally only dependent on `recenter`.
+    // It runs when the user clicks the "Center on Boat" button.
+    // The `lat` and `lon` values are correctly captured from the render
+    // triggered by the state change of `recenter`, so they are up-to-date.
+    if (mapRef.current && recenter > 0) {
       mapRef.current.panTo([lat, lon]);
     }
-  }, [recenter, lat, lon]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recenter]);
 
   return <div id="map"></div>;
 };
