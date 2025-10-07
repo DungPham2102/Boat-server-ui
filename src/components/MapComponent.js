@@ -1,5 +1,5 @@
 // @ts-ignore
-import React, { useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useEffect, useRef, useCallback } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -20,8 +20,6 @@ const MapComponent = ({ lat, lon, currentHead, targetHead, recenter }) => {
   const targetHeadingLineRef = useRef(null);
   const radarLinesRef = useRef(/** @type {L.Polyline[]} */ ([]));
   const animationFrameRef = useRef(null); // To control animation frame
-
-  const center = useMemo(() => [lat, lon], [lat, lon]);
 
   // Function to calculate a point given an angle and radius
   const rotateLine = useCallback((angle, centerCoord) => {
@@ -44,13 +42,34 @@ const MapComponent = ({ lat, lon, currentHead, targetHead, recenter }) => {
     return [newLat, newLon];
   }, []);
 
-  // Function to draw radar circles
-  const drawCircles = useCallback((map, centerCoord) => {
-    circlesRef.current.forEach((layer) => map.removeLayer(layer));
-    circlesRef.current = [];
+  // Initialize Map (runs only once)
+  useEffect(() => {
+    // @ts-ignore
+    const map = L.map("map", {
+      center: [lat, lon],
+      zoom: 19,
+      scrollWheelZoom: true,
+      touchZoom: true,
+      zoomControl: true,
+      dragging: true,
+      doubleClickZoom: true,
+      boxZoom: true,
+      keyboard: true,
+    });
+    mapRef.current = map;
+
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: "&copy; OpenStreetMap contributors",
+      maxZoom: 20,
+    }).addTo(map);
+
+    // @ts-ignore
+    boatMarkerRef.current = L.marker([lat, lon]).addTo(map);
+
+    // Draw initial circles
     const radii = [75, 50, 25];
     radii.forEach((radius) => {
-      const circle = L.circle(centerCoord, {
+      const circle = L.circle([lat, lon], {
         color: "rgb(131, 222, 70)",
         fillColor: "rgb(43, 75, 37)",
         fillOpacity: 0.4,
@@ -59,73 +78,26 @@ const MapComponent = ({ lat, lon, currentHead, targetHead, recenter }) => {
       // @ts-ignore
       circlesRef.current.push(circle);
     });
-  }, []);
 
-  // Function to update heading lines
-  const updateHeadingLines = useCallback(
-    (map, centerCoord) => {
-      const currentHeadingEnd = rotateLine(currentHead, centerCoord);
-      const targetHeadingEnd = rotateLine(targetHead, centerCoord);
+    // Draw initial heading lines
+    const currentHeadingEnd = rotateLine(currentHead, [lat, lon]);
+    // @ts-ignore
+    currentHeadingLineRef.current = L.polyline([[lat, lon], currentHeadingEnd], {
+      color: "yellow",
+      weight: 3,
+    }).addTo(map);
 
-      if (currentHeadingLineRef.current)
-        map.removeLayer(currentHeadingLineRef.current);
-      if (targetHeadingLineRef.current)
-        map.removeLayer(targetHeadingLineRef.current);
-
-      // @ts-ignore
-      currentHeadingLineRef.current = L.polyline(
-        [centerCoord, currentHeadingEnd],
-        {
-          color: "yellow",
-          weight: 3,
-        }
-      ).addTo(map);
-
-      // @ts-ignore
-      targetHeadingLineRef.current = L.polyline(
-        [centerCoord, targetHeadingEnd],
-        {
-          color: "red",
-          weight: 3,
-        }
-      ).addTo(map);
-    },
-    [currentHead, targetHead, rotateLine]
-  );
-
-  // Initialize Map
-  useEffect(() => {
-    if (!mapRef.current) {
-      // @ts-ignore
-      mapRef.current = L.map("map", {
-        // @ts-ignore
-        center: center,
-        zoom: 19, // Adjusted zoom
-        scrollWheelZoom: true,
-        touchZoom: true,
-        zoomControl: true,
-        dragging: true,
-        doubleClickZoom: true,
-        boxZoom: true,
-        keyboard: true,
-      });
-
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: "&copy; OpenStreetMap contributors",
-        maxZoom: 20, // Increased max zoom
-        // @ts-ignore
-      }).addTo(mapRef.current);
-
-      // @ts-ignore
-      boatMarkerRef.current = L.marker(center).addTo(mapRef.current);
-      drawCircles(mapRef.current, center);
-      updateHeadingLines(mapRef.current, center);
-    }
+    const targetHeadingEnd = rotateLine(targetHead, [lat, lon]);
+    // @ts-ignore
+    targetHeadingLineRef.current = L.polyline([[lat, lon], targetHeadingEnd], {
+      color: "red",
+      weight: 3,
+    }).addTo(map);
 
     // Radar animation setup
     let angle = 0;
     const updateRadarAnimation = () => {
-      if (mapRef.current) {
+      if (mapRef.current && boatMarkerRef.current) {
         // @ts-ignore
         const latLng = boatMarkerRef.current.getLatLng();
         const currentCenter = [latLng.lat, latLng.lng];
@@ -138,7 +110,6 @@ const MapComponent = ({ lat, lon, currentHead, targetHead, recenter }) => {
         }).addTo(mapRef.current);
         radarLinesRef.current.push(radarLine);
 
-        // Update fading
         radarLinesRef.current = radarLinesRef.current.filter((line) => {
           // @ts-ignore
           const currentOpacity = line.options.opacity - 0.05;
@@ -152,7 +123,7 @@ const MapComponent = ({ lat, lon, currentHead, targetHead, recenter }) => {
           }
         });
 
-        angle = (angle + 1) % 360; // Increase speed slightly
+        angle = (angle + 1) % 360;
       }
       // @ts-ignore
       animationFrameRef.current = requestAnimationFrame(updateRadarAnimation);
@@ -171,18 +142,34 @@ const MapComponent = ({ lat, lon, currentHead, targetHead, recenter }) => {
         mapRef.current = null;
       }
     };
-  }, [center, drawCircles, updateHeadingLines, rotateLine]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Run only once on mount
 
   // Update Boat Position & Map View
   useEffect(() => {
     if (mapRef.current && boatMarkerRef.current) {
+      const centerCoord = [lat, lon];
       // @ts-ignore
-      boatMarkerRef.current.setLatLng([lat, lon]);
-      drawCircles(mapRef.current, [lat, lon]);
-      updateHeadingLines(mapRef.current, [lat, lon]);
-    }
-  }, [lat, lon, currentHead, targetHead, drawCircles, updateHeadingLines]);
+      boatMarkerRef.current.setLatLng(centerCoord);
 
+      // Update circles
+      // @ts-ignore
+      circlesRef.current.forEach((circle) => {
+        circle.setLatLng(centerCoord);
+      });
+
+      // Update heading lines
+      const currentHeadingEnd = rotateLine(currentHead, centerCoord);
+      // @ts-ignore
+      currentHeadingLineRef.current.setLatLngs([centerCoord, currentHeadingEnd]);
+
+      const targetHeadingEnd = rotateLine(targetHead, centerCoord);
+      // @ts-ignore
+      targetHeadingLineRef.current.setLatLngs([centerCoord, targetHeadingEnd]);
+    }
+  }, [lat, lon, currentHead, targetHead, rotateLine]);
+
+  // Recenter map
   useEffect(() => {
     if (mapRef.current) {
       mapRef.current.panTo([lat, lon]);
