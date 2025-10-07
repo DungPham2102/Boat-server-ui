@@ -12,7 +12,7 @@ L.Icon.Default.mergeOptions({
   shadowUrl: require("leaflet/dist/images/marker-shadow.png"),
 });
 
-const MapComponent = ({ lat, lon, currentHead, targetHead }) => {
+const MapComponent = ({ lat, lon, currentHead, targetHead, recenter }) => {
   const mapRef = useRef(null);
   const boatMarkerRef = useRef(null);
   const circlesRef = useRef([]);
@@ -182,6 +182,12 @@ const MapComponent = ({ lat, lon, currentHead, targetHead }) => {
       updateHeadingLines(mapRef.current, [lat, lon]);
     }
   }, [lat, lon, currentHead, targetHead, drawCircles, updateHeadingLines]);
+
+  useEffect(() => {
+    if (mapRef.current) {
+      mapRef.current.panTo([lat, lon]);
+    }
+  }, [recenter, lat, lon]);
 
   return <div id="map"></div>;
 };

@@ -25,6 +25,7 @@ function App() {
   const [wsBoatId, setWsBoatId] = useState(""); // Default Boat ID
   const [serverIp, setServerIp] = useState("localhost"); // Default Server IP
   const [ipInput, setIpInput] = useState("localhost"); // IP input field
+  const [recenter, setRecenter] = useState(0);
 
   const handleConnect = () => {
     setServerIp(ipInput);
@@ -186,12 +187,18 @@ function App() {
             PID: telemetry.pid,
           }}
         />
-        <MapComponent
-          lat={telemetry.lat}
-          lon={telemetry.lon}
-          currentHead={telemetry.head}
-          targetHead={telemetry.targetHead}
-        />
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <MapComponent
+            lat={telemetry.lat}
+            lon={telemetry.lon}
+            currentHead={telemetry.head}
+            targetHead={telemetry.targetHead}
+            recenter={recenter}
+          />
+          <button onClick={() => setRecenter(c => c + 1)} style={{ marginTop: '-2px', padding: '10px 20px' }}>
+            Center on Boat
+          </button>
+        </div>
         <ControlPanel
           initialData={{
             mode: 0,
