@@ -99,17 +99,36 @@ app.listen(port, () => {
 const wss = new WebSocket.Server({ port: 8000 });
 
 // --- New WebSocket Logic ---
-// Key: boatId (string), Value: Set of WebSocket clients (UIs)
+// A map where keys are specific boatIds and values are Sets of UI clients
 const clientsByBoatId = new Map();
+// A set for UI clients that want data from ALL boats
+const allBoatsSubscribers = new Set();
 
 console.log("WebSocket server started on port 8000. Waiting for connections...");
 
 wss.on("connection", (ws, req) => {
   const path = req.url;
-  const boatId = path.substring(1);
+  const boatId = path.substring(1); // e.g., "boat1", "all", or ""
 
-  // If the URL has a boatId, it's a UI client subscribing for data.
-  if (boatId) {
+  // --- Connection Handling for UI Clients and Data Sources ---
+
+  if (boatId === "all") {
+    // This is a UI client subscribing to all boats
+    console.log("UI client connected, subscribing to ALL boats.");
+    allBoatsSubscribers.add(ws);
+
+    ws.on("close", () => {
+      console.log("UI client for ALL boats disconnected.");
+      allBoatsSubscribers.delete(ws);
+    });
+
+    ws.on("error", (error) => {
+      console.error("WebSocket error for 'all' subscriber:", error);
+      allBoatsSubscribers.delete(ws);
+    });
+
+  } else if (boatId) {
+    // This is a UI client subscribing to a SPECIFIC boat
     console.log(`UI client connected, subscribing to boat: ${boatId}`);
     if (!clientsByBoatId.has(boatId)) {
       clientsByBoatId.set(boatId, new Set());
@@ -127,13 +146,13 @@ wss.on("connection", (ws, req) => {
     });
 
   } else {
-    // If the URL is empty, it's a data source (our Python script).
+    // This is the data source (Python script)
     console.log("Data source connected.");
 
     ws.on('message', (message) => {
         const messageString = message.toString();
         
-        // Data format from Python script: "boat_id,lat,lon,..."
+        // Expected format: "boat_id,lat,lon,..."
         const parts = messageString.split(',');
         if (parts.length < 2) {
             console.log(`Invalid data format from source: ${messageString}. Skipping.`);
@@ -141,19 +160,20 @@ wss.on("connection", (ws, req) => {
         }
         const receivedBoatId = parts[0];
 
-        // Find all UI clients subscribed to this boatId
-        const subscribers = clientsByBoatId.get(receivedBoatId);
-        if (subscribers && subscribers.size > 0) {
-            console.log(`Broadcasting data for boat ${receivedBoatId} to ${subscribers.size} subscribers.`);
-            subscribers.forEach(client => {
+        // Get clients subscribed to this specific boat
+        const specificSubscribers = clientsByBoatId.get(receivedBoatId) || new Set();
+
+        // Combine specific subscribers and 'all' subscribers into one Set
+        // This prevents sending duplicate messages if a client is in both lists
+        const allReceivers = new Set([...specificSubscribers, ...allBoatsSubscribers]);
+
+        if (allReceivers.size > 0) {
+            // console.log(`Broadcasting data for boat ${receivedBoatId} to ${allReceivers.size} total subscribers.`);
+            allReceivers.forEach(client => {
                 if (client.readyState === WebSocket.OPEN) {
-                    // The UI expects the full data string
                     client.send(messageString);
                 }
             });
-        } else {
-            // This is normal if no UI is currently watching this boat
-            // console.log(`No subscribers found for boat ${receivedBoatId}.`);
         }
     });
 
