@@ -150,31 +150,44 @@ wss.on("connection", (ws, req) => {
     console.log("Data source connected.");
 
     ws.on('message', (message) => {
-        const messageString = message.toString();
-        
-        // Expected format: "boat_id,lat,lon,..."
-        const parts = messageString.split(',');
-        if (parts.length < 2) {
-            console.log(`Invalid data format from source: ${messageString}. Skipping.`);
-            return;
+      const messageString = message.toString();
+
+      // Expected format: "boat_id,lat,lon,..."
+      const parts = messageString.split(',');
+      if (parts.length < 2) {
+        console.log(`Invalid data format from source: ${messageString}. Skipping.`);
+        return;
+      }
+      const receivedBoatId = parts[0];
+
+      // Check if the boatId exists in the database
+      db.query(`SELECT * FROM boats WHERE boatId = ?`, [receivedBoatId], (err, results) => {
+        if (err) {
+          console.error('Error querying database:', err);
+          return;
         }
-        const receivedBoatId = parts[0];
 
-        // Get clients subscribed to this specific boat
-        const specificSubscribers = clientsByBoatId.get(receivedBoatId) || new Set();
+        // Only proceed if the boatId is found in the database
+        if (results.length > 0) {
+          // Get clients subscribed to this specific boat
+          const specificSubscribers = clientsByBoatId.get(receivedBoatId) || new Set();
 
-        // Combine specific subscribers and 'all' subscribers into one Set
-        // This prevents sending duplicate messages if a client is in both lists
-        const allReceivers = new Set([...specificSubscribers, ...allBoatsSubscribers]);
+          // Combine specific subscribers and 'all' subscribers into one Set
+          const allReceivers = new Set([...specificSubscribers, ...allBoatsSubscribers]);
 
-        if (allReceivers.size > 0) {
-            // console.log(`Broadcasting data for boat ${receivedBoatId} to ${allReceivers.size} total subscribers.`);
+          if (allReceivers.size > 0) {
+            // console.log(`Broadcasting data for boat ${receivedBoatId} to ${allReceivers.size} subscribers.`);
             allReceivers.forEach(client => {
-                if (client.readyState === WebSocket.OPEN) {
-                    client.send(messageString);
-                }
+              if (client.readyState === WebSocket.OPEN) {
+                client.send(messageString);
+              }
             });
+          }
+        } else {
+          // Optional: Log that data for an unregistered boat was received and ignored
+          // console.log(`Ignoring data for unregistered boatId: ${receivedBoatId}`);
         }
+      });
     });
 
     ws.on('close', () => {

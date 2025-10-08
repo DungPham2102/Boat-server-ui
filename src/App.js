@@ -133,6 +133,11 @@ function App() {
     pid: 0,
   };
 
+  const selectedBoat = boats.find((b) => b.boatId === selectedBoatId);
+  const selectedBoatDisplayName = selectedBoat
+    ? `${selectedBoat.name} (${selectedBoat.boatId})`
+    : selectedBoatId || "None";
+
   return (
     <div className="App">
       <Navbar />
@@ -177,17 +182,21 @@ function App() {
               <option value="" disabled>
                 -- Select a boat --
               </option>
-              {Object.keys(boatsData).map((boatId) => (
-                <option key={boatId} value={boatId}>
-                  {boatId}
-                </option>
-              ))}
+              {Object.keys(boatsData).map((boatId) => {
+                const boat = boats.find((b) => b.boatId === boatId);
+                const displayName = boat ? `${boat.name} (${boatId})` : boatId;
+                return (
+                  <option key={boatId} value={boatId}>
+                    {displayName}
+                  </option>
+                );
+              })}
             </select>
           </div>
         </div>
         <TelemetryPanel
           data={{
-            "Selected Boat": selectedBoatId || "None",
+            "Selected Boat": selectedBoatDisplayName,
             Lat: selectedBoatData.lat,
             Lon: selectedBoatData.lon,
             "Current Head": selectedBoatData.head,
