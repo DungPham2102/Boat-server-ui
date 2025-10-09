@@ -15,8 +15,8 @@ function App() {
   const [logs, setLogs] = useState([]);
   const [boats, setBoats] = useState([]); // List of boats from DB
   const websocketRef = useRef(null);
-  const [serverIp, setServerIp] = useState("localhost");
-  const [ipInput, setIpInput] = useState("localhost");
+  const [serverIp, setServerIp] = useState(window.location.hostname);
+  const [ipInput, setIpInput] = useState(window.location.hostname);
   const [recenter, setRecenter] = useState(0);
 
   const handleConnect = () => {
