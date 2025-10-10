@@ -166,3 +166,20 @@ input[type="text"]:read-only {
 .boat-manager-actions button {
   margin-right: 5px;
 }
+
+/* Notification Styles */
+.notification {
+  padding: 10px;
+  margin-top: 10px;
+  border-radius: 5px;
+  color: white;
+  text-align: center;
+}
+
+.notification.success {
+  background-color: #4CAF50; /* Green */
+}
+
+.notification.error {
+  background-color: #f44336; /* Red */
+}

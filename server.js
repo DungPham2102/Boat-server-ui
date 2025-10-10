@@ -47,8 +47,11 @@ app.post("/api/boats", (req, res) => {
     [name, boatId],
     (err, results) => {
       if (err) {
-        res.status(500).send(err);
-        return;
+        if (err.code === 'ER_DUP_ENTRY') {
+          return res.status(409).json({ error: `Boat with ID '${boatId}' already exists.` });
+        }
+        console.error("Error inserting into database:", err);
+        return res.status(500).json({ error: "Internal server error" });
       }
       res.status(201).json({ id: results.insertId, name, boatId });
     }
@@ -67,11 +70,14 @@ app.put("/api/boats/:id", (req, res) => {
     [name, boatId, id],
     (err, results) => {
       if (err) {
-        res.status(500).send(err);
-        return;
+        if (err.code === 'ER_DUP_ENTRY') {
+          return res.status(409).json({ error: `Boat with ID '${boatId}' already exists.` });
+        }
+        console.error("Error updating database:", err);
+        return res.status(500).json({ error: "Internal server error" });
       }
       if (results.affectedRows === 0) {
-        return res.status(404).send("Boat not found.");
+        return res.status(404).json({ error: "Boat not found." });
       }
       res.json({ id: parseInt(id), name, boatId });
     }

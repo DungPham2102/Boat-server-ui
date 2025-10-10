@@ -4,10 +4,16 @@ function BoatManager({ boats, setBoats }) {
   const [isEditing, setIsEditing] = useState(false);
   const [currentBoat, setCurrentBoat] = useState(null);
   const [formData, setFormData] = useState({ name: "", boatId: "" });
+  const [notification, setNotification] = useState({ type: "", message: "" });
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
+  };
+
+  const showNotification = (type, message) => {
+    setNotification({ type, message });
+    setTimeout(() => setNotification({ type: "", message: "" }), 5000);
   };
 
   const handleAdd = () => {
@@ -16,10 +22,20 @@ function BoatManager({ boats, setBoats }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(formData),
     })
-      .then((res) => res.json())
+      .then(async (res) => {
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({ error: 'Failed to parse error response' }));
+          throw new Error(errData.error || `Request failed with status ${res.status}`);
+        }
+        return res.json();
+      })
       .then((newBoat) => {
         setBoats([...boats, newBoat]);
         setFormData({ name: "", boatId: "" });
+        showNotification("success", "Boat added successfully!");
+      })
+      .catch(error => {
+        showNotification("error", error.message);
       });
   };
 
@@ -29,19 +45,34 @@ function BoatManager({ boats, setBoats }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(formData),
     })
-      .then((res) => res.json())
+      .then(async (res) => {
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({ error: 'Failed to parse error response' }));
+          throw new Error(errData.error || `Request failed with status ${res.status}`);
+        }
+        return res.json();
+      })
       .then((updatedBoat) => {
         setBoats(boats.map((b) => (b.id === updatedBoat.id ? updatedBoat : b)));
         setIsEditing(false);
         setCurrentBoat(null);
         setFormData({ name: "", boatId: "" });
+        showNotification("success", "Boat updated successfully!");
+      })
+      .catch(error => {
+        showNotification("error", error.message);
       });
   };
 
   const handleDelete = (id) => {
     fetch(`http://localhost:3001/api/boats/${id}`, { method: "DELETE" }).then(
-      () => {
-        setBoats(boats.filter((b) => b.id !== id));
+      (res) => {
+        if (res.ok) {
+          setBoats(boats.filter((b) => b.id !== id));
+          showNotification("success", "Boat deleted successfully!");
+        } else {
+          showNotification("error", "Failed to delete boat.");
+        }
       }
     );
   };
@@ -50,10 +81,19 @@ function BoatManager({ boats, setBoats }) {
     setIsEditing(true);
     setCurrentBoat(boat);
     setFormData({ name: boat.name, boatId: boat.boatId });
+    setNotification({ type: "", message: "" }); // Clear notification
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setCurrentBoat(null);
+    setFormData({ name: "", boatId: "" });
+    setNotification({ type: "", message: "" }); // Clear notification
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    setNotification({ type: "", message: "" }); // Clear notification
     if (isEditing) {
       handleUpdate();
     } else {
@@ -83,18 +123,16 @@ function BoatManager({ boats, setBoats }) {
         />
         <button type="submit">{isEditing ? "Update Boat" : "Add Boat"}</button>
         {isEditing && (
-          <button
-            type="button"
-            onClick={() => {
-              setIsEditing(false);
-              setCurrentBoat(null);
-              setFormData({ name: "", boatId: "" });
-            }}
-          >
+          <button type="button" onClick={handleCancelEdit}>
             Cancel
           </button>
         )}
       </form>
+      {notification.message && (
+        <div className={`notification ${notification.type}`}>
+          {notification.message}
+        </div>
+      )}
       <table className="boat-manager-table">
         <thead>
           <tr>
