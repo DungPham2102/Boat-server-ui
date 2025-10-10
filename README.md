@@ -1,3 +1,30 @@
+# Boat Monitoring System
+
+This project is the main server and web interface for a real-time boat tracking system.
+
+## System Architecture
+
+The system operates based on the following model:
+
+1.  **Boat Device**: Equipped with a GPS module and a LoRa transmitter. It continuously broadcasts its GPS coordinates via LoRa signals.
+
+2.  **Raspberry Pi (Gateway)**: A device with a LoRa receiver. It runs a script that:
+    *   Listens for LoRa signals from the boat.
+    *   Upon receiving data, it sends an HTTP POST request to the Laptop Server over the local network (LAN/WiFi) to forward the boat's location data.
+
+3.  **Laptop Server (This Project)**: A Node.js application that:
+    *   Provides an API endpoint to receive location data from the Pi Gateway.
+    *   Processes and stores the data in a database.
+    *   Hosts a WebSocket server to push real-time data to connected web clients.
+    *   Serves the React-based user interface.
+
+4.  **Web Browser (Client)**:
+    *   Loads the React user interface from the Laptop Server.
+    *   Establishes a WebSocket connection to the server to receive live location updates.
+    *   Displays the boat's position and other telemetry data on a map for the user.
+
+---
+
 # Project Setup and Running Guide
 
 ## 1. Initial Setup
