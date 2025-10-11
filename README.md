@@ -59,6 +59,18 @@ In the project root, run:
 npm install
 ```
 
+### Configure Gateway Connection
+To send commands from the UI to the boat, the server needs to know the IP address of the Raspberry Pi Gateway.
+
+-   **File**: `server.js`
+-   **Function**: `forwardCommandToGateway`
+-   **Variable**: `const gatewayIp`
+
+You must configure this IP address to match your Raspberry Pi's static IP. For example:
+```javascript
+const gatewayIp = "192.168.1.100"; // <-- Replace with your Pi's actual IP
+```
+
 ---
 
 ## 2. Running the Application
