@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 
-function BoatManager({ boats, setBoats }) {
+function BoatManager({ boats, setBoats, serverIp }) {
   const [isEditing, setIsEditing] = useState(false);
   const [currentBoat, setCurrentBoat] = useState(null);
   const [formData, setFormData] = useState({ name: "", boatId: "" });
@@ -17,7 +17,7 @@ function BoatManager({ boats, setBoats }) {
   };
 
   const handleAdd = () => {
-    fetch("http://localhost:3001/api/boats", {
+    fetch(`http://${serverIp}:3001/api/boats`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(formData),
@@ -40,7 +40,7 @@ function BoatManager({ boats, setBoats }) {
   };
 
   const handleUpdate = () => {
-    fetch(`http://localhost:3001/api/boats/${currentBoat.id}`, {
+    fetch(`http://${serverIp}:3001/api/boats/${currentBoat.id}`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(formData),
@@ -65,7 +65,7 @@ function BoatManager({ boats, setBoats }) {
   };
 
   const handleDelete = (id) => {
-    fetch(`http://localhost:3001/api/boats/${id}`, { method: "DELETE" }).then(
+    fetch(`http://${serverIp}:3001/api/boats/${id}`, { method: "DELETE" }).then(
       (res) => {
         if (res.ok) {
           setBoats(boats.filter((b) => b.id !== id));
