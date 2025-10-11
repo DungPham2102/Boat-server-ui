@@ -2,6 +2,7 @@ const express = require("express");
 const mysql = require("mysql");
 const cors = require("cors");
 const WebSocket = require("ws");
+const http = require("http");
 const path = require("path");
 
 const app = express();
@@ -47,8 +48,10 @@ app.post("/api/boats", (req, res) => {
     [name, boatId],
     (err, results) => {
       if (err) {
-        if (err.code === 'ER_DUP_ENTRY') {
-          return res.status(409).json({ error: `Boat with ID '${boatId}' already exists.` });
+        if (err.code === "ER_DUP_ENTRY") {
+          return res
+            .status(409)
+            .json({ error: `Boat with ID '${boatId}' already exists.` });
         }
         console.error("Error inserting into database:", err);
         return res.status(500).json({ error: "Internal server error" });
@@ -70,8 +73,10 @@ app.put("/api/boats/:id", (req, res) => {
     [name, boatId, id],
     (err, results) => {
       if (err) {
-        if (err.code === 'ER_DUP_ENTRY') {
-          return res.status(409).json({ error: `Boat with ID '${boatId}' already exists.` });
+        if (err.code === "ER_DUP_ENTRY") {
+          return res
+            .status(409)
+            .json({ error: `Boat with ID '${boatId}' already exists.` });
         }
         console.error("Error updating database:", err);
         return res.status(500).json({ error: "Internal server error" });
@@ -100,14 +105,14 @@ app.delete("/api/boats/:id", (req, res) => {
 });
 
 // Serve the React app for production
-if (process.env.NODE_ENV === 'production') {
+if (process.env.NODE_ENV === "production") {
   // Serve static files from the React app
-  app.use(express.static(path.join(__dirname, 'build')));
+  app.use(express.static(path.join(__dirname, "build")));
 
   // The "catchall" handler: for any request that doesn't match one above,
   // send back React's index.html file.
   app.get(/.*/, (req, res) => {
-    res.sendFile(path.join(__dirname, 'build', 'index.html'));
+    res.sendFile(path.join(__dirname, "build", "index.html"));
   });
 }
 
@@ -116,14 +121,77 @@ const wss = new WebSocket.Server({ port: 8000 });
 const clientsByBoatId = new Map();
 const allBoatsSubscribers = new Set();
 
-console.log("WebSocket server started on port 8000. Waiting for UI connections...");
+console.log(
+  "WebSocket server started on port 8000. Waiting for UI connections..."
+);
+
+// This function forwards a command to the Raspberry Pi Gateway
+function forwardCommandToGateway(boatId, commandData) {
+  // IMPORTANT: Replace 'RASPBERRY_PI_IP' with the actual IP of your Gateway.
+  // It is recommended to store this IP in the 'boats' table in your database.
+  const gatewayIp = "localhost"; // <--- THAY THẾ IP NÀY
+  const gatewayPort = 5000; // Port for the Python server on the Gateway
+
+  const postData = JSON.stringify({
+    boatId: boatId,
+    command: commandData,
+  });
+
+  const options = {
+    hostname: gatewayIp,
+    port: gatewayPort,
+    path: "/command",
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Content-Length": Buffer.byteLength(postData),
+    },
+  };
+
+  const req = http.request(options, (res) => {
+    console.log(`GATEWAY RESPONSE STATUS: ${res.statusCode}`);
+    res.setEncoding("utf8");
+    res.on("data", (chunk) => {
+      console.log(`GATEWAY RESPONSE BODY: ${chunk}`);
+    });
+  });
+
+  req.on("error", (e) => {
+    console.error(`Error sending command to gateway: ${e.message}`);
+  });
+
+  req.write(postData);
+  req.end();
+}
 
 wss.on("connection", (ws, req) => {
   const path = req.url;
-  const boatId = path.substring(1); // e.g., "/all" -> "all", "/boat1" -> "boat1"
+  const boatIdFromPath = path.substring(1);
 
-  // This server now only accepts connections from UI clients
-  if (boatId === "all") {
+  // Handle incoming commands from the UI
+  ws.on("message", (message) => {
+    try {
+      const messageString = message.toString();
+      console.log(`Received command from UI: ${messageString}`);
+
+      // Expected format from UI: "boatId,mode,speed,targetLat,targetLon,kp,ki,kd"
+      const parts = messageString.split(",");
+      if (parts.length < 8) {
+        console.error("Invalid command format from UI:", messageString);
+        return;
+      }
+
+      const boatId = parts[0];
+
+      // Forward the entire original message string to the gateway
+      forwardCommandToGateway(boatId, messageString);
+    } catch (e) {
+      console.error("Failed to process message from UI:", e);
+    }
+  });
+
+  // Handle subscriptions for real-time data
+  if (boatIdFromPath === "all") {
     console.log("UI client connected, subscribing to ALL boats.");
     allBoatsSubscribers.add(ws);
     ws.on("close", () => {
@@ -134,22 +202,27 @@ wss.on("connection", (ws, req) => {
       console.error("WebSocket error for 'all' subscriber:", error);
       allBoatsSubscribers.delete(ws);
     });
-  } else if (boatId) {
-    console.log(`UI client connected, subscribing to boat: ${boatId}`);
-    if (!clientsByBoatId.has(boatId)) {
-      clientsByBoatId.set(boatId, new Set());
+  } else if (boatIdFromPath) {
+    console.log(`UI client connected, subscribing to boat: ${boatIdFromPath}`);
+    if (!clientsByBoatId.has(boatIdFromPath)) {
+      clientsByBoatId.set(boatIdFromPath, new Set());
     }
-    clientsByBoatId.get(boatId).add(ws);
+    clientsByBoatId.get(boatIdFromPath).add(ws);
     ws.on("close", () => {
-      console.log(`UI client for boat ${boatId} disconnected`);
-      clientsByBoatId.get(boatId).delete(ws);
+      console.log(`UI client for boat ${boatIdFromPath} disconnected`);
+      clientsByBoatId.get(boatIdFromPath).delete(ws);
     });
     ws.on("error", (error) => {
-      console.error(`WebSocket error for UI client (boat ${boatId}):`, error);
-      clientsByBoatId.get(boatId).delete(ws);
+      console.error(
+        `WebSocket error for UI client (boat ${boatIdFromPath}):`,
+        error
+      );
+      clientsByBoatId.get(boatIdFromPath).delete(ws);
     });
   } else {
-    console.log("A client connected with an unspecified path. Closing connection.");
+    console.log(
+      "A client connected with an unspecified path. Closing connection."
+    );
     ws.close();
   }
 });
@@ -159,14 +232,16 @@ app.post("/api/telemetry", (req, res) => {
   // The request body is expected to be the raw string from LoRa.
   // We need to enable a raw text body parser for this.
   const messageString = req.body;
-  
-  if (typeof messageString !== 'string') {
-      console.log(`Received non-string data: ${JSON.stringify(req.body)}`);
-      return res.status(400).send("Invalid data format. Expected a raw text string.");
+
+  if (typeof messageString !== "string") {
+    console.log(`Received non-string data: ${JSON.stringify(req.body)}`);
+    return res
+      .status(400)
+      .send("Invalid data format. Expected a raw text string.");
   }
 
   // Expected format: "boat_id,lat,lon,..."
-  const parts = messageString.split(',');
+  const parts = messageString.split(",");
   if (parts.length < 2) {
     console.log(`Invalid data format from source: ${messageString}. Skipping.`);
     return res.status(400).send("Invalid data format.");
@@ -174,31 +249,39 @@ app.post("/api/telemetry", (req, res) => {
   const receivedBoatId = parts[0];
 
   // Check if the boatId exists in the database
-  db.query(`SELECT * FROM boats WHERE boatId = ?`, [receivedBoatId], (err, results) => {
-    if (err) {
-      console.error('Error querying database:', err);
-      return res.status(500).send("Database error.");
-    }
-
-    if (results.length > 0) {
-      // Get clients subscribed to this specific boat
-      const specificSubscribers = clientsByBoatId.get(receivedBoatId) || new Set();
-      // Combine specific subscribers and 'all' subscribers
-      const allReceivers = new Set([...specificSubscribers, ...allBoatsSubscribers]);
-
-      if (allReceivers.size > 0) {
-        allReceivers.forEach(client => {
-          if (client.readyState === WebSocket.OPEN) {
-            client.send(messageString);
-          }
-        });
+  db.query(
+    `SELECT * FROM boats WHERE boatId = ?`,
+    [receivedBoatId],
+    (err, results) => {
+      if (err) {
+        console.error("Error querying database:", err);
+        return res.status(500).send("Database error.");
       }
-      res.status(200).send("Data received and broadcasted.");
-    } else {
-      // console.log(`Ignoring data for unregistered boatId: ${receivedBoatId}`);
-      res.status(404).send("Boat ID not registered.");
+
+      if (results.length > 0) {
+        // Get clients subscribed to this specific boat
+        const specificSubscribers =
+          clientsByBoatId.get(receivedBoatId) || new Set();
+        // Combine specific subscribers and 'all' subscribers
+        const allReceivers = new Set([
+          ...specificSubscribers,
+          ...allBoatsSubscribers,
+        ]);
+
+        if (allReceivers.size > 0) {
+          allReceivers.forEach((client) => {
+            if (client.readyState === WebSocket.OPEN) {
+              client.send(messageString);
+            }
+          });
+        }
+        res.status(200).send("Data received and broadcasted.");
+      } else {
+        // console.log(`Ignoring data for unregistered boatId: ${receivedBoatId}`);
+        res.status(404).send("Boat ID not registered.");
+      }
     }
-  });
+  );
 });
 
 const server = app.listen(port, () => {
