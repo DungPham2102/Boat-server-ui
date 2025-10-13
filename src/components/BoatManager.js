@@ -1,10 +1,15 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
-function BoatManager({ boats, setBoats, serverIp }) {
+function BoatManager({ boats, setBoats, serverIp, token }) {
   const [isEditing, setIsEditing] = useState(false);
   const [currentBoat, setCurrentBoat] = useState(null);
   const [formData, setFormData] = useState({ name: "", boatId: "" });
   const [notification, setNotification] = useState({ type: "", message: "" });
+
+  // When the list of boats from the parent changes, clear the form
+  useEffect(() => {
+    handleCancelEdit();
+  }, [boats]);
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
@@ -16,10 +21,15 @@ function BoatManager({ boats, setBoats, serverIp }) {
     setTimeout(() => setNotification({ type: "", message: "" }), 5000);
   };
 
+  const getAuthHeaders = () => ({
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${token}`,
+  });
+
   const handleAdd = () => {
     fetch(`http://${serverIp}:3001/api/boats`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify(formData),
     })
       .then(async (res) => {
@@ -42,7 +52,7 @@ function BoatManager({ boats, setBoats, serverIp }) {
   const handleUpdate = () => {
     fetch(`http://${serverIp}:3001/api/boats/${currentBoat.id}`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers: getAuthHeaders(),
       body: JSON.stringify(formData),
     })
       .then(async (res) => {
@@ -65,16 +75,25 @@ function BoatManager({ boats, setBoats, serverIp }) {
   };
 
   const handleDelete = (id) => {
-    fetch(`http://${serverIp}:3001/api/boats/${id}`, { method: "DELETE" }).then(
-      (res) => {
+    fetch(`http://${serverIp}:3001/api/boats/${id}`, {
+      method: "DELETE",
+      headers: { "Authorization": `Bearer ${token}` },
+    })
+      .then((res) => {
         if (res.ok) {
           setBoats(boats.filter((b) => b.id !== id));
           showNotification("success", "Boat deleted successfully!");
         } else {
-          showNotification("error", "Failed to delete boat.");
+          res.json().then(err => {
+            showNotification("error", err.message || "Failed to delete boat.");
+          }).catch(() => {
+            showNotification("error", "Failed to delete boat.");
+          });
         }
-      }
-    );
+      })
+      .catch(error => {
+        showNotification("error", error.message);
+      });
   };
 
   const handleEditClick = (boat) => {

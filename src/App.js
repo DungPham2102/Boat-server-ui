@@ -5,9 +5,12 @@ import ControlPanel from "./components/ControlPanel";
 import MapComponent from "./components/MapComponent";
 import Console from "./components/Console";
 import BoatManager from "./components/BoatManager";
+import Login from "./components/Login"; // Import the Login component
 import "./styles.css";
 
 function App() {
+  const [token, setToken] = useState(null);
+
   // State to hold all boats' telemetry data, keyed by boatId
   const [boatsData, setBoatsData] = useState({});
   const [selectedBoatId, setSelectedBoatId] = useState(null);
@@ -19,29 +22,68 @@ function App() {
   const [ipInput, setIpInput] = useState(window.location.hostname);
   const [recenter, setRecenter] = useState(0);
 
+  // Check for a token in localStorage on initial render
+  useEffect(() => {
+    const storedToken = localStorage.getItem('accessToken');
+    if (storedToken) {
+      setToken(storedToken);
+    }
+  }, []);
+
+  const handleLoginSuccess = (newToken) => {
+    localStorage.setItem('accessToken', newToken);
+    setToken(newToken);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('accessToken');
+    setToken(null);
+    // Also clear other relevant state
+    setBoatsData({});
+    setBoats([]);
+    setSelectedBoatId(null);
+  };
+
   const handleConnect = () => {
     setServerIp(ipInput);
   };
-
-  // Fetch boat metadata from the API
-  useEffect(() => {
-    if (!serverIp) return;
-    fetch(`http://${serverIp}:3001/api/boats`)
-      .then((res) => res.json())
-      .then(setBoats)
-      .catch((err) => {
-        console.error("Error fetching boats:", err);
-        setBoats([]);
-      });
-  }, [serverIp]);
 
   const appendLog = useCallback((msg) => {
     setLogs((prev) => [...prev, `${new Date().toLocaleTimeString()}: ${msg}`]);
   }, []);
 
+  // Fetch boat metadata from the API
+  useEffect(() => {
+    if (!serverIp || !token) return; // Don't fetch if not logged in
+
+    fetch(`http://${serverIp}:3001/api/boats`, {
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+      .then(async (res) => {
+        if (res.ok) {
+          return res.json();
+        }
+        // If token is invalid, log out
+        if (res.status === 401 || res.status === 403) {
+          handleLogout();
+        }
+        const errorText = await res.text();
+        throw new Error(errorText || 'Failed to fetch boats');
+      })
+      .then(setBoats)
+      .catch((err) => {
+        console.error("Error fetching boats:", err);
+        appendLog(`Error fetching boats: ${err.message}`);
+        setBoats([]);
+      });
+  }, [serverIp, token, appendLog]);
+
+
   // Setup WebSocket to listen for ALL boats
   useEffect(() => {
-    if (!serverIp) return;
+    if (!serverIp || !token) return; // Don't connect if not logged in
 
     try {
       // Connect to the '/all' endpoint to receive data from all boats
@@ -91,13 +133,13 @@ function App() {
       };
 
       return () => {
-        if (ws && ws.readyState === WebSocket.OPEN) ws.close();
+        if (ws && ws.readyState !== WebSocket.CLOSED) ws.close();
       };
     } catch (error) {
       console.error("WebSocket construction error:", error);
       appendLog("Invalid Server IP format.");
     }
-  }, [appendLog, serverIp]);
+  }, [appendLog, serverIp, token]);
 
   const sendDataToWebSocket = useCallback(
     (dataToSend) => {
@@ -122,6 +164,11 @@ function App() {
     [appendLog, selectedBoatId]
   );
 
+  // If not logged in, show the Login component
+  if (!token) {
+    return <Login onLoginSuccess={handleLoginSuccess} />;
+  }
+
   // Data for the currently selected boat, or empty object if none
   const selectedBoatData = boatsData[selectedBoatId] || {
     lat: 21.03873701,
@@ -140,7 +187,7 @@ function App() {
 
   return (
     <div className="App">
-      <Navbar />
+      <Navbar onLogout={handleLogout} />
       <div className="app-container">
         <div className="websocket-configurator">
           <div style={{ display: "flex", alignItems: "center", marginBottom: "10px" }}>
@@ -230,7 +277,7 @@ function App() {
           onSend={sendDataToWebSocket}
           disabled={!selectedBoatId} // Disable panel if no boat is selected
         />
-        <BoatManager boats={boats} setBoats={setBoats} serverIp={serverIp} />
+        <BoatManager boats={boats} setBoats={setBoats} serverIp={serverIp} token={token} />
       </div>
       <Console logs={logs} />
     </div>

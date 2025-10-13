@@ -27,7 +27,103 @@ db.connect((err) => {
   console.log("Connected to MySQL database");
 });
 
-app.get("/api/boats", (req, res) => {
+// --- Authentication ---
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcrypt");
+
+// IMPORTANT: In a real application, store this secret in an environment variable.
+const JWT_SECRET = "your-super-secret-key-that-is-long-and-random";
+const saltRounds = 10; // for bcrypt
+
+
+
+
+// --- Authentication Endpoints ---
+
+// Register Endpoint
+app.post("/api/register", async (req, res) => {
+  const { username, password } = req.body;
+
+  if (!username || !password) {
+    return res.status(400).send("Username and password are required.");
+  }
+
+  try {
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+    const query = "INSERT INTO users (username, password) VALUES (?, ?)";
+    
+    db.query(query, [username, hashedPassword], (err, result) => {
+      if (err) {
+        if (err.code === 'ER_DUP_ENTRY') {
+          return res.status(409).send("Username already exists.");
+        }
+        console.error("Error registering user:", err);
+        return res.status(500).send("Error registering user.");
+      }
+      res.status(201).send("User registered successfully.");
+    });
+  } catch (error) {
+    console.error("Error hashing password:", error);
+    res.status(500).send("Internal server error.");
+  }
+});
+
+// Login Endpoint
+app.post("/api/login", (req, res) => {
+  const { username, password } = req.body;
+
+  if (!username || !password) {
+    return res.status(400).send("Username and password are required.");
+  }
+
+  const query = "SELECT * FROM users WHERE username = ?";
+  db.query(query, [username], async (err, results) => {
+    if (err) {
+      console.error("Error during login:", err);
+      return res.status(500).send("Internal server error.");
+    }
+
+    if (results.length === 0) {
+      return res.status(401).send("Username or password incorrect.");
+    }
+
+    const user = results[0];
+
+    try {
+      const isMatch = await bcrypt.compare(password, user.password);
+      if (isMatch) {
+        const accessToken = jwt.sign({ username: user.username, id: user.id }, JWT_SECRET, { expiresIn: '1h' });
+        res.json({ accessToken });
+      } else {
+        res.status(401).send("Username or password incorrect.");
+      }
+    } catch (error) {
+      console.error("Error comparing password:", error);
+      res.status(500).send("Internal server error.");
+    }
+  });
+});
+
+// Authentication Middleware
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1]; // Format: "Bearer TOKEN"
+
+  if (token == null) {
+    return res.status(401).send("A token is required for authentication");
+  }
+
+  jwt.verify(token, JWT_SECRET, (err, user) => {
+    if (err) {
+      return res.status(403).send("Token is not valid");
+    }
+    req.user = user;
+    next();
+  });
+};
+// --- End Authentication ---
+
+app.get("/api/boats", authenticateToken, (req, res) => {
   db.query("SELECT * FROM boats", (err, results) => {
     if (err) {
       res.status(500).send(err);
@@ -38,7 +134,7 @@ app.get("/api/boats", (req, res) => {
 });
 
 // Add a new boat
-app.post("/api/boats", (req, res) => {
+app.post("/api/boats", authenticateToken, (req, res) => {
   const { name, boatId } = req.body;
   if (!name || !boatId) {
     return res.status(400).send("Name and Boat ID are required.");
@@ -62,7 +158,7 @@ app.post("/api/boats", (req, res) => {
 });
 
 // Update an existing boat
-app.put("/api/boats/:id", (req, res) => {
+app.put("/api/boats/:id", authenticateToken, (req, res) => {
   const { id } = req.params;
   const { name, boatId } = req.body;
   if (!name || !boatId) {
@@ -90,7 +186,7 @@ app.put("/api/boats/:id", (req, res) => {
 });
 
 // Delete a boat
-app.delete("/api/boats/:id", (req, res) => {
+app.delete("/api/boats/:id", authenticateToken, (req, res) => {
   const { id } = req.params;
   db.query("DELETE FROM boats WHERE id = ?", [id], (err, results) => {
     if (err) {
