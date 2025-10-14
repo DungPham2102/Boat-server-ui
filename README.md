@@ -15,8 +15,8 @@ The system operates based on the following model:
     *   **Downstream:** It provides an API endpoint to receive commands from the Laptop Server and transmits them to the boat via LoRa.
 
 3.  **Laptop Server (This Project)**: A Node.js application that:
-    *   **Upstream:** Provides an API to receive telemetry data from the Gateway, processes it, and pushes it to the browser via WebSocket.
-    *   **Downstream:** Receives control commands from the browser via WebSocket and forwards them to the Gateway by sending an HTTP POST request.
+    *   **Upstream:** Provides an API to receive telemetry data from the Gateway, processes it, saves it to a database, and pushes it to the browser via WebSocket.
+    *   **Downstream:** Receives control commands from the browser via WebSocket, saves them to a database, and forwards them to the Gateway by sending an HTTP POST request.
     *   Serves the React-based user interface and handles user authentication.
 
 4.  **Web Browser (Client)**: The React application running in the user's browser.
@@ -52,6 +52,38 @@ CREATE TABLE users (
   username VARCHAR(255) NOT NULL UNIQUE,
   password VARCHAR(255) NOT NULL,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Create the table for telemetry logs (data from boats)
+CREATE TABLE telemetry_logs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  boat_id VARCHAR(255) NOT NULL,
+  latitude DECIMAL(10, 8) NOT NULL,
+  longitude DECIMAL(11, 8) NOT NULL,
+  current_head FLOAT,
+  target_head FLOAT,
+  left_speed INT,
+  right_speed INT,
+  pid_output FLOAT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (boat_id) REFERENCES boats(boatId)
+);
+
+-- Create the table for command logs (data to boats)
+CREATE TABLE command_logs (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  boat_id VARCHAR(255) NOT NULL,
+  user_id INT,
+  mode INT,
+  speed INT,
+  target_lat DECIMAL(10, 8),
+  target_lon DECIMAL(11, 8),
+  kp FLOAT,
+  ki FLOAT,
+  kd FLOAT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (boat_id) REFERENCES boats(boatId),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 ```
 
