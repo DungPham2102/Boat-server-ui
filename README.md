@@ -61,8 +61,24 @@ INSERT INTO boats (name, boatId) VALUES ('Boat 1', '00001');
 INSERT INTO boats (name, boatId) VALUES ('Boat 2', '00002');
 ```
 
-### Configure Connection
-Open `server.js` and update the `mysql.createConnection` details with your database credentials.
+### Configuration
+Before starting the server, you must create a `.env` file in the root of the project to store necessary credentials. This is a mandatory step.
+
+1.  Create a file named `.env` in the project root.
+2.  Copy the following template into it and replace the values with your own credentials.
+
+```
+# JWT Secret for signing authentication tokens
+JWT_SECRET="your-super-secret-key-that-is-long-and-random"
+
+# MySQL Database Connection
+DB_HOST="localhost"
+DB_USER="your_db_user"
+DB_PASSWORD="your_db_password"
+DB_DATABASE="boat_db"
+```
+
+> **Note:** The server will not start correctly if this file is missing or if any of the variables are not set.
 
 ### Install Dependencies
 In the project root, run:
@@ -83,6 +99,7 @@ const gatewayIp = "192.168.1.100"; // <-- Replace with your Pi's actual IP
 ```
 
 ---
+
 
 ## 2. Running the Application
 
