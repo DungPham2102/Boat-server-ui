@@ -90,8 +90,8 @@ function App() {
     if (!serverIp || !token) return; // Don't connect if not logged in
 
     try {
-      // Connect to the '/all' endpoint to receive data from all boats
-      const ws = new WebSocket(`ws://${serverIp}:8000/all`);
+      // Connect to the '/all' endpoint, passing the token for authentication
+      const ws = new WebSocket(`ws://${serverIp}:8000/all?token=${token}`);
       websocketRef.current = ws;
 
       ws.onopen = () => {
