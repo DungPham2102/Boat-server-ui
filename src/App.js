@@ -74,8 +74,12 @@ function App() {
       })
       .then(setBoats)
       .catch((err) => {
-        console.error("Error fetching boats:", err);
-        appendLog(`Error fetching boats: ${err.message}`);
+        if (err.message.includes("Token is not valid")) {
+          appendLog("Session expired. Please log in again.");
+        } else {
+          console.error("Error fetching boats:", err);
+          appendLog(`Error fetching boats: ${err.message}`);
+        }
         setBoats([]);
       });
   }, [serverIp, token, appendLog]);
