@@ -1,3 +1,5 @@
+require("dotenv").config();
+
 const express = require("express");
 const mysql = require("mysql");
 const cors = require("cors");
@@ -13,10 +15,10 @@ app.use(express.json());
 app.use(express.text()); // Middleware for raw text bodies
 
 const db = mysql.createConnection({
-  host: "localhost",
-  user: "admin",
-  password: "admin", // Replace with your MySQL password
-  database: "boat_db", // Replace with your database name
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD,
+  database: process.env.DB_DATABASE,
 });
 
 db.connect((err) => {
@@ -31,12 +33,8 @@ db.connect((err) => {
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
 
-// IMPORTANT: In a real application, store this secret in an environment variable.
-const JWT_SECRET = "your-super-secret-key-that-is-long-and-random";
+const JWT_SECRET = process.env.JWT_SECRET;
 const saltRounds = 10; // for bcrypt
-
-
-
 
 // --- Authentication Endpoints ---
 
