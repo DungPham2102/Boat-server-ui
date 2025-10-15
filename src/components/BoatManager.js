@@ -6,11 +6,6 @@ function BoatManager({ boats, setBoats, serverIp, token }) {
   const [formData, setFormData] = useState({ name: "", boatId: "" });
   const [notification, setNotification] = useState({ type: "", message: "" });
 
-  // When the list of boats from the parent changes, clear the form
-  useEffect(() => {
-    handleCancelEdit();
-  }, [boats]);
-
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setFormData({ ...formData, [name]: value });
