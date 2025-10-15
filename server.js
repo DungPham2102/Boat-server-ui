@@ -227,10 +227,8 @@ function forwardCommandToGateway(boatId, commandData) {
   const gatewayIp = "localhost"; // <--- THAY THẾ IP NÀY
   const gatewayPort = 5000; // Port for the Python server on the Gateway
 
-  const postData = JSON.stringify({
-    boatId: boatId,
-    command: commandData,
-  });
+  // The commandData is the raw string we want to send
+  const postData = commandData;
 
   const options = {
     hostname: gatewayIp,
@@ -238,7 +236,7 @@ function forwardCommandToGateway(boatId, commandData) {
     path: "/command",
     method: "POST",
     headers: {
-      "Content-Type": "application/json",
+      "Content-Type": "text/plain", // Set content type to plain text
       "Content-Length": Buffer.byteLength(postData),
     },
   };

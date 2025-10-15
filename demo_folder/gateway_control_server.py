@@ -53,27 +53,29 @@ def send_lora_command(command_string):
 def handle_command():
     """
     Đây là API endpoint mà Laptop Server sẽ gọi.
-    Nó nhận một lệnh và chuyển tiếp đến module LoRa.
+    Nó nhận một lệnh (dưới dạng chuỗi thô) và chuyển tiếp đến module LoRa.
     """
-    if not request.is_json:
-        return jsonify({"error": "Request phải là JSON"}), 400
+    # Dữ liệu lệnh giờ là toàn bộ body của request, dưới dạng text
+    command = request.get_data(as_text=True)
 
-    data = request.get_json()
-    boat_id = data.get('boatId')
-    command = data.get('command') # Đây là toàn bộ chuỗi lệnh từ UI
+    if not command:
+        return "Error: Request body is empty", 400
 
-    if not boat_id or not command:
-        return jsonify({"error": "Thiếu 'boatId' hoặc 'command' trong request"}), 400
+    # Tách boat_id từ chuỗi lệnh để ghi log (tùy chọn)
+    try:
+        boat_id = command.split(',')[0]
+        print(f"✅ Đã nhận lệnh cho thuyền '{boat_id}': {command}")
+    except IndexError:
+        print(f"✅ Đã nhận lệnh (không có boat_id): {command}")
 
-    print(f"✅ Đã nhận lệnh cho thuyền '{boat_id}': {command}")
 
     # Dữ liệu 'command' nhận được chính là chuỗi text bạn cần
     # ví dụ: "00001,0,1500,21.689,102.092,1.0,0.1,0.05"
     # Chỉ cần gửi thẳng chuỗi này qua LoRa.
     if send_lora_command(command):
-        return jsonify({"status": "Lệnh đã được gửi tới module LoRa"}), 200
+        return "Command sent to LoRa module", 200
     else:
-        return jsonify({"error": "Không thể gửi lệnh qua LoRa"}), 500
+        return "Failed to send command via LoRa", 500
 
 if __name__ == '__main__':
     print("--- Gateway Control Server ---")
