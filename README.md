@@ -66,7 +66,7 @@ CREATE TABLE telemetry_logs (
   right_speed INT,
   pid_output FLOAT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (boat_id) REFERENCES boats(boatId)
+  FOREIGN KEY (boat_id) REFERENCES boats(boatId) ON DELETE CASCADE
 );
 
 -- Create the table for command logs (data to boats)
@@ -82,7 +82,7 @@ CREATE TABLE command_logs (
   ki FLOAT,
   kd FLOAT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (boat_id) REFERENCES boats(boatId),
+  FOREIGN KEY (boat_id) REFERENCES boats(boatId) ON DELETE CASCADE,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 ```
