@@ -29,6 +29,13 @@ The system operates based on the following model:
 
 ## 1. Initial Setup
 
+### Prerequisites
+
+Before you begin, ensure you have the following installed:
+
+*   **Node.js**: This project requires Node.js version `20.19.2`. Using other versions may cause issues during dependency installation.
+*   **npm**: Node Package Manager, which is included with Node.js.
+
 ### Database
 First, set up your MySQL database. Execute the following SQL commands to create the database and the required tables.
 
