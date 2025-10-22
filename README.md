@@ -39,6 +39,25 @@ Before you begin, ensure you have the following installed:
 ### Database
 First, set up your MySQL database. Execute the following SQL commands to create the database and the required tables.
 
+#### 1. Create Database User (Required)
+Before creating the tables, you need a dedicated MySQL user for the application. Run these commands in your MySQL client:
+
+```sql
+-- 1. Create user 'admin' to connect from localhost, using the old authentication method and setting a password.
+CREATE USER 'admin'@'localhost' IDENTIFIED WITH 'mysql_native_password' BY 'password';
+
+-- 2. Grant all privileges (like root) to user 'admin' on all databases.
+GRANT ALL PRIVILEGES ON *.* TO 'admin'@'localhost' WITH GRANT OPTION;
+
+-- 3. Reload the grant tables for the changes to take effect immediately.
+FLUSH PRIVILEGES;
+```
+
+> **Note:** Remember to use the same credentials (`admin` and `password`) in your `.env` file later.
+
+#### 2. Create Database and Tables
+Now, execute the following SQL commands to create the database and tables:
+
 ```sql
 -- Create the database
 CREATE DATABASE boat_db;
