@@ -100,6 +100,7 @@ function App() {
       };
 
       ws.onmessage = (event) => {
+        appendLog(`Received from boat: ${event.data}`);
         const data = event.data.split(",");
         // Data format: BOAT_ID,lat,lon,current_head,target_head,left_speed,right_speed,pid
         if (data.length < 8) return;
