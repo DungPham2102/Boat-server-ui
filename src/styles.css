@@ -1,5 +1,5 @@
 .App {
-  zoom: 90%;
+  zoom: 80%;
 }
 
 body {
@@ -177,7 +177,7 @@ input[type="text"]:read-only {
 }
 
 .notification.success {
-  background-color: #4CAF50; /* Green */
+  background-color: #4caf50; /* Green */
 }
 
 .notification.error {
