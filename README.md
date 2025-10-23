@@ -6,22 +6,25 @@ This project contains the main server and web interface for a real-time boat tra
 
 The system operates based on the following model:
 
-1.  **Boat Device**: Equipped with a GPS module and a LoRa transceiver. 
-    *   **Upstream:** It continuously broadcasts its GPS coordinates and status (telemetry) via LoRa signals.
-    *   **Downstream:** It listens for, receives, and executes control commands sent from the Gateway.
+1.  **Boat Device**: Equipped with a GPS module and a LoRa transceiver.
+
+    - **Upstream:** It continuously broadcasts its GPS coordinates and status (telemetry) via LoRa signals.
+    - **Downstream:** It listens for, receives, and executes control commands sent from the Gateway.
 
 2.  **Raspberry Pi (Gateway)**: A device with a LoRa transceiver running a dedicated script.
-    *   **Upstream:** It listens for LoRa signals from the boat and forwards the data by sending an HTTP POST request to the Laptop Server.
-    *   **Downstream:** It provides an API endpoint to receive commands from the Laptop Server and transmits them to the boat via LoRa.
+
+    - **Upstream:** It listens for LoRa signals from the boat and forwards the data by sending an HTTP POST request to the Laptop Server.
+    - **Downstream:** It provides an API endpoint to receive commands from the Laptop Server and transmits them to the boat via LoRa.
 
 3.  **Laptop Server (This Project)**: A Node.js application that:
-    *   **Upstream:** Provides an API to receive telemetry data from the Gateway, processes it, saves it to a database, and pushes it to the browser via WebSocket.
-    *   **Downstream:** Receives control commands from the browser via WebSocket, saves them to a database, and forwards them to the Gateway by sending an HTTP POST request.
-    *   Serves the React-based user interface and handles user authentication.
+
+    - **Upstream:** Provides an API to receive telemetry data from the Gateway, processes it, saves it to a database, and pushes it to the browser via WebSocket.
+    - **Downstream:** Receives control commands from the browser via WebSocket, saves them to a database, and forwards them to the Gateway by sending an HTTP POST request.
+    - Serves the React-based user interface and handles user authentication.
 
 4.  **Web Browser (Client)**: The React application running in the user's browser.
-    *   **Upstream:** Loads the UI, establishes a WebSocket connection, and displays the boat's live position and status.
-    *   **Downstream:** Captures user input (e.g., setting a new target, changing mode) and sends these commands to the Laptop Server via WebSocket.
+    - **Upstream:** Loads the UI, establishes a WebSocket connection, and displays the boat's live position and status.
+    - **Downstream:** Captures user input (e.g., setting a new target, changing mode) and sends these commands to the Laptop Server via WebSocket.
 
 ---
 
@@ -33,13 +36,15 @@ The system operates based on the following model:
 
 Before you begin, ensure you have the following installed:
 
-*   **Node.js**: This project requires Node.js version `20.19.2`. Using other versions may cause issues during dependency installation.
-*   **npm**: Node Package Manager, which is included with Node.js.
+- **Node.js**: This project requires Node.js version `20.19.2`. Using other versions may cause issues during dependency installation.
+- **npm**: Node Package Manager, which is included with Node.js.
 
 ### Database
+
 First, set up your MySQL database. Execute the following SQL commands to create the database and the required tables.
 
 #### 1. Create Database User (Required)
+
 Before creating the tables, you need a dedicated MySQL user for the application. Run these commands in your MySQL client:
 
 ```sql
@@ -56,6 +61,7 @@ FLUSH PRIVILEGES;
 > **Note:** Remember to use the same credentials (`admin` and `password`) in your `.env` file later.
 
 #### 2. Create Database and Tables
+
 Now, execute the following SQL commands to create the database and tables:
 
 ```sql
@@ -114,12 +120,14 @@ CREATE TABLE command_logs (
 ```
 
 You can add optional sample data for boats:
+
 ```sql
 INSERT INTO boats (name, boatId) VALUES ('Boat 1', '00001');
 INSERT INTO boats (name, boatId) VALUES ('Boat 2', '00002');
 ```
 
 ### Configuration
+
 Before starting the server, you must create a `.env` file in the root of the project to store necessary credentials. This is a mandatory step.
 
 1.  Create a file named `.env` in the project root.
@@ -139,66 +147,69 @@ DB_DATABASE="boat_db"
 > **Note:** The server will not start correctly if this file is missing or if any of the variables are not set.
 
 ### Install Dependencies
+
 In the project root, run:
+
 ```bash
 npm install
 ```
 
 ### Configure Gateway Connection
+
 To send commands from the UI to the boat, the server needs to know the IP address of the Raspberry Pi Gateway.
 
--   **File**: `server.js`
--   **Function**: `forwardCommandToGateway`
--   **Variable**: `const gatewayIp`
+- **File**: `server.js`
+- **Function**: `forwardCommandToGateway`
+- **Variable**: `const gatewayIp`
 
 You must configure this IP address to match your Raspberry Pi's static IP. For example:
+
 ```javascript
 const gatewayIp = "192.168.1.100"; // <-- Replace with your Pi's actual IP
 ```
 
 ---
 
-
 ## 2. Running the Application
 
 You can run this application in two modes: Development or Production.
 
 ### Development Environment
+
 **Purpose:** For coding, testing new features, and debugging. Requires up to **3 separate terminals**.
 
 1.  **Run the Backend Server (Terminal 1):**
     Starts the API server on `http://localhost:3001`.
+
     ```bash
     node server.js
     ```
 
 2.  **Run the Frontend Server (Terminal 2):**
     Starts the React development server on `http://localhost:3000` with hot-reloading.
+
     ```bash
     npm start
     ```
 
-3.  **Register Your First User (Terminal 3, run once):**
-    Before you can log in, you must create a user account. Use a tool like `curl` or Postman to send a `POST` request.
-    ```bash
-    curl -X POST http://localhost:3001/api/register \
-    -H "Content-Type: application/json" \
-    -d '{"username": "admin", "password": "your_password"}'
-    ```
+### 3.  **Register Your First User:**
+    Before you can log in, you must create a user account. You can do this directly from the login page of the application.
 
 **To use the app, open your browser to `http://localhost:3000` and log in with the credentials you just registered.**
 
 ### Production Environment
+
 **Purpose:** For deploying the final, optimized version of the application.
 
 1.  **Build the Frontend Application:**
     This command bundles the React app into static files in a `build` directory. You only need to run this when you have made changes to the frontend code (`src` folder).
+
     ```bash
     npm run build
     ```
 
 2.  **Register a User (If you haven't already):**
-    Follow step 3 from the Development Environment section to create a user account.
+    If you haven't created a user account yet, you can do so from the login page.
 
 3.  **Run the Production Server:**
     This single command starts the server on `http://localhost:3001`, serving both the API and the optimized frontend application.
