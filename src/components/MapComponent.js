@@ -189,7 +189,7 @@ const MapComponent = ({ boatsData, selectedBoatId, recenter, onBoatSelect }) => 
       const { lat, lon } = boatsData[selectedBoatId];
       mapRef.current.panTo([lat, lon]);
     }
-  }, [recenter, selectedBoatId, boatsData]);
+  }, [recenter, selectedBoatId]);
 
   return <div id="map"></div>;
 };
