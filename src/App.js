@@ -158,7 +158,7 @@ function App() {
         websocketRef.current.readyState === WebSocket.OPEN
       ) {
         // Prepend the selected boat's ID to the message
-        const dataString = `${selectedBoatId},${dataToSend.mode},${dataToSend.speed},${dataToSend.targetLat},${dataToSend.targetLon},${dataToSend.kp},${dataToSend.ki},${dataToSend.kd}`;
+        const dataString = `${selectedBoatId},${dataToSend.speed},${dataToSend.targetLat},${dataToSend.targetLon},${dataToSend.kp},${dataToSend.ki},${dataToSend.kd}`;
         websocketRef.current.send(dataString);
         appendLog(`Data sent to ${selectedBoatId}: ${dataString}`);
       } else {
@@ -271,7 +271,6 @@ function App() {
         </div>
         <ControlPanel
           initialData={{
-            mode: 0,
             speed: 1500,
             targetLat: 21.68942656,
             targetLon: 102.09262948,

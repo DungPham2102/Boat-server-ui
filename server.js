@@ -289,25 +289,24 @@ wss.on("connection", (ws, req) => {
       try {
         const messageString = message.toString();
 
-        // Expected format from UI: "boatId,mode,speed,targetLat,targetLon,kp,ki,kd"
+        // Expected format from UI: "boatId,speed,targetLat,targetLon,kp,ki,kd"
         const parts = messageString.split(",");
-        if (parts.length < 8) {
+        if (parts.length < 7) {
           console.error("Invalid command format from UI:", messageString);
           return;
         }
 
         // --- BEGIN: LOG COMMAND DATA ---
-        const logQuery = `INSERT INTO command_logs (boat_id, user_id, mode, speed, target_lat, target_lon, kp, ki, kd) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+        const logQuery = `INSERT INTO command_logs (boat_id, user_id, speed, target_lat, target_lon, kp, ki, kd) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
         const logValues = [
           parts[0],           // boat_id
           ws.user.id,         // user_id (from the authenticated ws connection)
-          parseInt(parts[1]), // mode
-          parseInt(parts[2]), // speed
-          parseFloat(parts[3]),// target_lat
-          parseFloat(parts[4]),// target_lon
-          parseFloat(parts[5]),// kp
-          parseFloat(parts[6]),// ki
-          parseFloat(parts[7]),// kd
+          parseInt(parts[1]), // speed
+          parseFloat(parts[2]),// target_lat
+          parseFloat(parts[3]),// target_lon
+          parseFloat(parts[4]),// kp
+          parseFloat(parts[5]),// ki
+          parseFloat(parts[6]),// kd
         ];
 
         db.query(logQuery, logValues, (logErr, logResult) => {

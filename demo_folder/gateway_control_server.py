@@ -70,7 +70,7 @@ def handle_command():
 
 
     # Dữ liệu 'command' nhận được chính là chuỗi text bạn cần
-    # ví dụ: "00001,0,1500,21.689,102.092,1.0,0.1,0.05"
+    # ví dụ: "00001,1500,21.689,102.092,1.0,0.1,0.05"
     # Chỉ cần gửi thẳng chuỗi này qua LoRa.
     if send_lora_command(command):
         return "Command sent to LoRa module", 200
