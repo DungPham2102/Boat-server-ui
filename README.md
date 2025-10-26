@@ -24,7 +24,7 @@ The system operates based on the following model:
 
 4.  **Web Browser (Client)**: The React application running in the user's browser.
     - **Upstream:** Loads the UI, establishes a WebSocket connection, and displays the boat's live position and status.
-    - **Downstream:** Captures user input (e.g., setting a new target, changing mode) and sends these commands to the Laptop Server via WebSocket.
+    - **Downstream:** Captures user input (e.g., setting a new target) and sends these commands to the Laptop Server via WebSocket.
 
 ---
 
@@ -106,7 +106,6 @@ CREATE TABLE command_logs (
   id INT AUTO_INCREMENT PRIMARY KEY,
   boat_id VARCHAR(255) NOT NULL,
   user_id INT,
-  mode INT,
   speed INT,
   target_lat DECIMAL(10, 8),
   target_lon DECIMAL(11, 8),
