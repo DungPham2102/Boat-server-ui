@@ -28,6 +28,86 @@ The system operates based on the following model:
 
 ---
 
+# Data Formats
+
+To ensure the system operates correctly, components communicating with the Node.js server must adhere to the following JSON formats.
+
+### 1. Telemetry Data from Gateway to Server
+
+This is the data flow from the boat's device, through the Gateway, which is sent to the server's `/api/telemetry` endpoint via an HTTP `POST` request.
+
+**Required Format:**
+
+- **Content-Type**: `application/json`
+- **Body**:
+  ```json
+  {
+    "boatId": "string",
+    "lat": number,
+    "lon": number,
+    "head": number,
+    "targetHead": number,
+    "leftSpeed": number,
+    "rightSpeed": number
+  }
+  ```
+
+**Important Notes:**
+- `boatId` must be a string.
+- All other fields (`lat`, `lon`, `head`, etc.) must be of type number, **not** enclosed in quotes.
+
+**Example:**
+```json
+{
+  "boatId": "00001",
+  "lat": 21.038737,
+  "lon": 105.782458,
+  "head": 45.5,
+  "targetHead": 50,
+  "leftSpeed": 1510,
+  "rightSpeed": 1510
+}
+```
+
+### 2. Control Commands from User Interface (UI) to Server
+
+This is the data flow sent from the browser (UI) to the server via a WebSocket connection when a user sends a control command.
+
+**Required Format:**
+
+- The data is a JSON string.
+- **Contents of the parsed JSON string:**
+  ```json
+  {
+    "boatId": "string",
+    "speed": number,
+    "targetLat": number,
+    "targetLon": number,
+    "kp": number,
+    "ki": number,
+    "kd": number
+  }
+  ```
+
+**Important Notes:**
+- `boatId` must be a string.
+- The control fields (`speed`, `targetLat`, `kp`, etc.) must be of type number.
+
+**Example:**
+```json
+{
+  "boatId": "00001",
+  "speed": 1550,
+  "targetLat": 21.689426,
+  "targetLon": 102.092629,
+  "kp": 1.0,
+  "ki": 0.1,
+  "kd": 0.05
+}
+```
+
+---
+
 # Project Setup and Running Guide
 
 ## 1. Initial Setup
