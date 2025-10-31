@@ -5,13 +5,29 @@ const ControlPanel = ({ initialData, onSend }) => {
 
   const handleChange = (e) => {
     const { id, value } = e.target;
-    // Convert to number if the value is a valid number, otherwise keep as string
-    const numericValue = !isNaN(parseFloat(value)) && isFinite(value) ? parseFloat(value) : value;
-    setControls((prev) => ({ ...prev, [id]: numericValue }));
+    setControls((prev) => ({ ...prev, [id]: value }));
   };
 
   const handleSend = () => {
-    onSend(controls);
+    // Process controls before sending to handle different number formats (e.g., comma as decimal separator).
+    const processedControls = Object.entries(controls).reduce((acc, [key, value]) => {
+      // If the value is a string, try to convert it to a number.
+      if (typeof value === 'string') {
+        // Replace comma with period for decimal conversion.
+        const sanitizedValue = value.replace(',', '.');
+        // Check if it's a valid number, but not an empty string.
+        if (sanitizedValue.trim() !== '' && !isNaN(parseFloat(sanitizedValue)) && isFinite(sanitizedValue)) {
+          acc[key] = parseFloat(sanitizedValue);
+        } else {
+          acc[key] = value; // Keep original string if not a valid number
+        }
+      } else {
+        acc[key] = value; // Keep as is if it's already a number or other type
+      }
+      return acc;
+    }, {});
+
+    onSend(processedControls);
   };
 
   return (
