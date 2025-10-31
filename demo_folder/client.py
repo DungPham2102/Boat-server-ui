@@ -71,10 +71,9 @@ def update_boat_state(boat_id):
 
     # Target heading can be fixed or randomized
     target_head = (boat["head"] + random.randint(-10, 10) + 360) % 360
-    pid_value = random.uniform(0.5, 2.5)
 
-    # Format: BOAT_ID,lat,lon,current_head,target_head,left_speed,right_speed,pid
-    return f"{boat_id},{boat['lat']:.6f},{boat['lon']:.6f},{boat['head']:.0f},{target_head:.0f},{boat['left_speed']},{boat['right_speed']},{pid_value:.2f}"
+    # Format: BOAT_ID,lat,lon,current_head,target_head,left_speed,right_speed
+    return f"{boat_id},{boat['lat']:.6f},{boat['lon']:.6f},{boat['head']:.0f},{target_head:.0f},{boat['left_speed']},{boat['right_speed']}"
 
 def send_data_http():
     """Continuously sends simulated boat data to the server via HTTP POST."""
