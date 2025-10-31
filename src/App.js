@@ -102,8 +102,8 @@ function App() {
       ws.onmessage = (event) => {
         appendLog(`Received from boat: ${event.data}`);
         const data = event.data.split(",");
-        // Data format: BOAT_ID,lat,lon,current_head,target_head,left_speed,right_speed,pid
-        if (data.length < 8) return;
+        // Data format: BOAT_ID,lat,lon,current_head,target_head,left_speed,right_speed
+        if (data.length < 7) return;
 
         const boatId = data[0];
 
@@ -117,7 +117,6 @@ function App() {
             targetHead: parseFloat(data[4]) || 0,
             leftSpeed: parseInt(data[5]) || 1500,
             rightSpeed: parseInt(data[6]) || 1500,
-            pid: parseFloat(data[7]) || 0,
           },
         }));
 
@@ -182,7 +181,6 @@ function App() {
     targetHead: 0,
     leftSpeed: 1500,
     rightSpeed: 1500,
-    pid: 0,
   };
 
   const selectedBoat = boats.find((b) => b.boatId === selectedBoatId);
@@ -255,7 +253,6 @@ function App() {
             "Target Head": selectedBoatData.targetHead,
             "Left Speed (pwm)": selectedBoatData.leftSpeed,
             "Right Speed (pwm)": selectedBoatData.rightSpeed,
-            PID: selectedBoatData.pid,
           }}
         />
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>

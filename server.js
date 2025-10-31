@@ -381,9 +381,9 @@ app.post("/api/telemetry", (req, res) => {
       .send("Invalid data format. Expected a raw text string.");
   }
 
-  // Data format from App.js: BOAT_ID,lat,lon,current_head,target_head,left_speed,right_speed,pid
+  // Data format: BOAT_ID,lat,lon,current_head,target_head,left_speed,right_speed
   const parts = messageString.split(",");
-  if (parts.length < 8) {
+  if (parts.length < 7) {
     console.log(`Invalid data format from source: ${messageString}. Skipping.`);
     return res.status(400).send("Invalid data format.");
   }
@@ -401,7 +401,7 @@ app.post("/api/telemetry", (req, res) => {
 
       if (results.length > 0) {
         // --- BEGIN: LOG TELEMETRY DATA ---
-        const logQuery = `INSERT INTO telemetry_logs (boat_id, latitude, longitude, current_head, target_head, left_speed, right_speed, pid_output) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
+        const logQuery = `INSERT INTO telemetry_logs (boat_id, latitude, longitude, current_head, target_head, left_speed, right_speed) VALUES (?, ?, ?, ?, ?, ?, ?)`;
         const logValues = [
           receivedBoatId,       // boat_id
           parseFloat(parts[1]), // latitude
@@ -410,7 +410,6 @@ app.post("/api/telemetry", (req, res) => {
           parseFloat(parts[4]), // target_head
           parseInt(parts[5]),   // left_speed
           parseInt(parts[6]),   // right_speed
-          parseFloat(parts[7]), // pid_output
         ];
 
         db.query(logQuery, logValues, (logErr, logResult) => {
