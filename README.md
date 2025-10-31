@@ -96,7 +96,6 @@ CREATE TABLE telemetry_logs (
   target_head FLOAT,
   left_speed INT,
   right_speed INT,
-  pid_output FLOAT,
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (boat_id) REFERENCES boats(boatId) ON DELETE CASCADE
 );
