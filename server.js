@@ -13,7 +13,7 @@ const port = 3001;
 
 app.use(cors());
 app.use(express.json());
-app.use(express.text()); // Middleware for raw text bodies
+
 
 const db = mysql.createConnection({
   host: process.env.DB_HOST,
@@ -227,8 +227,8 @@ function forwardCommandToGateway(boatId, commandData) {
   const gatewayIp = "localhost"; // <--- THAY THẾ IP NÀY
   const gatewayPort = 5000; // Port for the Python server on the Gateway
 
-  // The commandData is the raw string we want to send
-  const postData = commandData;
+  // The commandData is now a JSON object, so we stringify it
+  const postData = JSON.stringify(commandData);
 
   const options = {
     hostname: gatewayIp,
@@ -236,7 +236,7 @@ function forwardCommandToGateway(boatId, commandData) {
     path: "/command",
     method: "POST",
     headers: {
-      "Content-Type": "text/plain", // Set content type to plain text
+      "Content-Type": "application/json", // Set content type to JSON
       "Content-Length": Buffer.byteLength(postData),
     },
   };
@@ -287,44 +287,38 @@ wss.on("connection", (ws, req) => {
     // Handle incoming commands from the UI
     ws.on("message", (message) => {
       try {
-        const messageString = message.toString();
-
-        // Expected format from UI: "boatId,speed,targetLat,targetLon,kp,ki,kd"
-        const parts = messageString.split(",");
-        if (parts.length < 7) {
-          console.error("Invalid command format from UI:", messageString);
-          return;
-        }
+        // Expect command from UI as a JSON string
+        const command = JSON.parse(message);
 
         // --- BEGIN: LOG COMMAND DATA ---
         const logQuery = `INSERT INTO command_logs (boat_id, user_id, speed, target_lat, target_lon, kp, ki, kd) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`;
         const logValues = [
-          parts[0],           // boat_id
-          ws.user.id,         // user_id (from the authenticated ws connection)
-          parseInt(parts[1]), // speed
-          parseFloat(parts[2]),// target_lat
-          parseFloat(parts[3]),// target_lon
-          parseFloat(parts[4]),// kp
-          parseFloat(parts[5]),// ki
-          parseFloat(parts[6]),// kd
+          command.boatId,
+          ws.user.id, // user_id from the authenticated ws connection
+          command.speed,
+          command.targetLat,
+          command.targetLon,
+          command.kp,
+          command.ki,
+          command.kd,
         ];
 
         db.query(logQuery, logValues, (logErr, logResult) => {
           if (logErr) {
             console.error("Error saving command log:", logErr);
-            // For now, we'll allow the command to be sent even if logging fails.
           } else {
-            console.log(`Command from user ${ws.user.username} logged for boat ${parts[0]}.`);
+            console.log(
+              `Command from user ${ws.user.username} logged for boat ${command.boatId}.`
+            );
           }
         });
         // --- END: LOG COMMAND DATA ---
 
-        const boatId = parts[0];
-
-        // Forward the entire original message string to the gateway
-        forwardCommandToGateway(boatId, messageString);
-        console.log(`Command from ${ws.user.username} sent to gateway for boat ${boatId}`);
-
+        // Forward the entire command object to the gateway
+        forwardCommandToGateway(command.boatId, command);
+        console.log(
+          `Command from ${ws.user.username} sent to gateway for boat ${command.boatId}`
+        );
       } catch (e) {
         console.error("Failed to process message from UI:", e);
       }
@@ -368,26 +362,33 @@ wss.on("connection", (ws, req) => {
   });
 });
 
-// New API endpoint for receiving telemetry data from Raspberry Pi
+// API endpoint for receiving telemetry data from Raspberry Pi (now expects JSON)
 app.post("/api/telemetry", (req, res) => {
-  // The request body is expected to be the raw string from LoRa.
-  // We need to enable a raw text body parser for this.
-  const messageString = req.body;
+  // The request body is now expected to be a JSON object.
+  const data = req.body;
 
-  if (typeof messageString !== "string") {
-    console.log(`Received non-string data: ${JSON.stringify(req.body)}`);
-    return res
-      .status(400)
-      .send("Invalid data format. Expected a raw text string.");
+  // Validate the incoming data
+  if (!data || typeof data !== "object") {
+    return res.status(400).send("Invalid data format. Expected a JSON object.");
   }
 
-  // Data format: BOAT_ID,lat,lon,current_head,target_head,left_speed,right_speed
-  const parts = messageString.split(",");
-  if (parts.length < 7) {
-    console.log(`Invalid data format from source: ${messageString}. Skipping.`);
-    return res.status(400).send("Invalid data format.");
+  const {
+    boatId,
+    lat,
+    lon,
+    head,
+    targetHead,
+    leftSpeed,
+    rightSpeed
+  } = data;
+
+  // Check for essential fields
+  if (!boatId || lat === undefined || lon === undefined) {
+    console.log(`Invalid data format from source: ${JSON.stringify(data)}. Skipping.`);
+    return res.status(400).send("Invalid data format. Missing required fields.");
   }
-  const receivedBoatId = parts[0];
+
+  const receivedBoatId = boatId;
 
   // Check if the boatId exists in the database
   db.query(
@@ -403,13 +404,13 @@ app.post("/api/telemetry", (req, res) => {
         // --- BEGIN: LOG TELEMETRY DATA ---
         const logQuery = `INSERT INTO telemetry_logs (boat_id, latitude, longitude, current_head, target_head, left_speed, right_speed) VALUES (?, ?, ?, ?, ?, ?, ?)`;
         const logValues = [
-          receivedBoatId,       // boat_id
-          parseFloat(parts[1]), // latitude
-          parseFloat(parts[2]), // longitude
-          parseFloat(parts[3]), // current_head
-          parseFloat(parts[4]), // target_head
-          parseInt(parts[5]),   // left_speed
-          parseInt(parts[6]),   // right_speed
+          receivedBoatId,
+          lat,
+          lon,
+          head,
+          targetHead,
+          leftSpeed,
+          rightSpeed,
         ];
 
         db.query(logQuery, logValues, (logErr, logResult) => {
@@ -419,6 +420,10 @@ app.post("/api/telemetry", (req, res) => {
           }
         });
         // --- END: LOG TELEMETRY DATA ---
+
+        // Construct the telemetry data object to be sent to the UI
+        // (The incoming data is already in the correct format)
+        const telemetryData = data;
 
         // Get clients subscribed to this specific boat
         const specificSubscribers =
@@ -430,9 +435,10 @@ app.post("/api/telemetry", (req, res) => {
         ]);
 
         if (allReceivers.size > 0) {
+          const jsonData = JSON.stringify(telemetryData);
           allReceivers.forEach((client) => {
             if (client.readyState === WebSocket.OPEN) {
-              client.send(messageString);
+              client.send(jsonData);
             }
           });
         }

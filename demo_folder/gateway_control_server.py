@@ -52,27 +52,38 @@ def send_lora_command(command_string):
 @app.route('/command', methods=['POST'])
 def handle_command():
     """
-    Đây là API endpoint mà Laptop Server sẽ gọi.
-    Nó nhận một lệnh (dưới dạng chuỗi thô) và chuyển tiếp đến module LoRa.
+    This is the API endpoint that the main server will call.
+    It receives a JSON command object and forwards it to the LoRa module as a formatted string.
     """
-    # Dữ liệu lệnh giờ là toàn bộ body của request, dưới dạng text
-    command = request.get_data(as_text=True)
+    # Get the JSON data from the request
+    data = request.get_json()
 
-    if not command:
-        return "Error: Request body is empty", 400
+    if not data:
+        return "Error: Request body is empty or not JSON", 400
 
-    # Tách boat_id từ chuỗi lệnh để ghi log (tùy chọn)
+    # Extract required fields from the JSON data
     try:
-        boat_id = command.split(',')[0]
-        print(f"✅ Đã nhận lệnh cho thuyền '{boat_id}': {command}")
-    except IndexError:
-        print(f"✅ Đã nhận lệnh (không có boat_id): {command}")
+        boat_id = data['boatId']
+        # Use .get() for optional fields with default values
+        speed = data.get('speed', 1500)
+        target_lat = data.get('targetLat', 0)
+        target_lon = data.get('targetLon', 0)
+        kp = data.get('kp', 0)
+        ki = data.get('ki', 0)
+        kd = data.get('kd', 0)
+        
+        print(f"✅ Received command for boat '{boat_id}': {data}")
 
+    except KeyError as e:
+        print(f"❌ Error: Missing key in JSON data: {e}")
+        return f"Error: Missing key in JSON data: {e}", 400
 
-    # Dữ liệu 'command' nhận được chính là chuỗi text bạn cần
-    # ví dụ: "00001,1500,21.689,102.092,1.0,0.1,0.05"
-    # Chỉ cần gửi thẳng chuỗi này qua LoRa.
-    if send_lora_command(command):
+    # Format the data into the string format expected by the LoRa module/boat
+    # Format: "boat_id,speed,target_lat,target_lon,kp,ki,kd"
+    command_string = f"{boat_id},{speed},{target_lat},{target_lon},{kp},{ki},{kd}"
+
+    # Send the formatted string command via LoRa
+    if send_lora_command(command_string):
         return "Command sent to LoRa module", 200
     else:
         return "Failed to send command via LoRa", 500

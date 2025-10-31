@@ -100,28 +100,35 @@ function App() {
       };
 
       ws.onmessage = (event) => {
-        appendLog(`Received from boat: ${event.data}`);
-        const data = event.data.split(",");
-        // Data format: BOAT_ID,lat,lon,current_head,target_head,left_speed,right_speed
-        if (data.length < 7) return;
+        appendLog(`Received data: ${event.data}`);
+        try {
+          const data = JSON.parse(event.data);
+          const { boatId, lat, lon, head, targetHead, leftSpeed, rightSpeed } = data;
 
-        const boatId = data[0];
+          if (!boatId) {
+            appendLog("Received data without boatId.");
+            return;
+          }
 
-        // Update the state for the specific boat
-        setBoatsData((prev) => ({
-          ...prev,
-          [boatId]: {
-            lat: parseFloat(data[1]) || 0,
-            lon: parseFloat(data[2]) || 0,
-            head: parseFloat(data[3]) || 0,
-            targetHead: parseFloat(data[4]) || 0,
-            leftSpeed: parseInt(data[5]) || 1500,
-            rightSpeed: parseInt(data[6]) || 1500,
-          },
-        }));
+          // Update the state for the specific boat
+          setBoatsData((prev) => ({
+            ...prev,
+            [boatId]: {
+              lat: lat || 0,
+              lon: lon || 0,
+              head: head || 0,
+              targetHead: targetHead || 0,
+              leftSpeed: leftSpeed || 1500,
+              rightSpeed: rightSpeed || 1500,
+            },
+          }));
 
-        // If no boat is selected yet, select the first one that sends data
-        setSelectedBoatId(currentId => currentId || boatId);
+          // If no boat is selected yet, select the first one that sends data
+          setSelectedBoatId((currentId) => currentId || boatId);
+        } catch (error) {
+          console.error("Failed to parse JSON:", error);
+          appendLog("Received non-JSON message.");
+        }
       };
 
       ws.onclose = () => {
@@ -156,8 +163,11 @@ function App() {
         websocketRef.current &&
         websocketRef.current.readyState === WebSocket.OPEN
       ) {
-        // Prepend the selected boat's ID to the message
-        const dataString = `${selectedBoatId},${dataToSend.speed},${dataToSend.targetLat},${dataToSend.targetLon},${dataToSend.kp},${dataToSend.ki},${dataToSend.kd}`;
+        const payload = {
+          boatId: selectedBoatId,
+          ...dataToSend,
+        };
+        const dataString = JSON.stringify(payload);
         websocketRef.current.send(dataString);
         appendLog(`Data sent to ${selectedBoatId}: ${dataString}`);
       } else {

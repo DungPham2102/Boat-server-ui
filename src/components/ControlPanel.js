@@ -5,7 +5,9 @@ const ControlPanel = ({ initialData, onSend }) => {
 
   const handleChange = (e) => {
     const { id, value } = e.target;
-    setControls((prev) => ({ ...prev, [id]: value }));
+    // Convert to number if the value is a valid number, otherwise keep as string
+    const numericValue = !isNaN(parseFloat(value)) && isFinite(value) ? parseFloat(value) : value;
+    setControls((prev) => ({ ...prev, [id]: numericValue }));
   };
 
   const handleSend = () => {

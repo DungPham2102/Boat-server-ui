@@ -10,6 +10,7 @@ import requests
 import random
 import math
 import time
+import json
 
 # The full URL of the server's API endpoint
 SERVER_URL = "http://localhost:3001/api/telemetry"
@@ -72,31 +73,39 @@ def update_boat_state(boat_id):
     # Target heading can be fixed or randomized
     target_head = (boat["head"] + random.randint(-10, 10) + 360) % 360
 
-    # Format: BOAT_ID,lat,lon,current_head,target_head,left_speed,right_speed
-    return f"{boat_id},{boat['lat']:.6f},{boat['lon']:.6f},{boat['head']:.0f},{target_head:.0f},{boat['left_speed']},{boat['right_speed']}"
+    # Return a dictionary (JSON object) instead of a string
+    return {
+        "boatId": boat_id,
+        "lat": round(boat['lat'], 6),
+        "lon": round(boat['lon'], 6),
+        "head": round(boat['head']),
+        "targetHead": round(target_head),
+        "leftSpeed": boat['left_speed'],
+        "rightSpeed": boat['right_speed']
+    }
 
 def send_data_http():
     """Continuously sends simulated boat data to the server via HTTP POST."""
-    print(f"✅ Starting data transmission to {SERVER_URL}")
+    print(f"✅ Starting JSON data transmission to {SERVER_URL}")
     
     while True:
         try:
             # Iterate through each boat, update and send its data
             for boat_id in boats.keys():
-                message = update_boat_state(boat_id)
+                data_dict = update_boat_state(boat_id)
                 
-                # Define headers to specify we're sending plain text
-                headers = {'Content-Type': 'text/plain'}
+                # Define headers to specify we're sending JSON
+                headers = {'Content-Type': 'application/json'}
                 
-                # Send the data as the body of a POST request
-                response = requests.post(SERVER_URL, data=message, headers=headers, timeout=5)
+                # Send the data as a JSON string in the body of a POST request
+                response = requests.post(SERVER_URL, data=json.dumps(data_dict), headers=headers, timeout=5)
                 
                 # Check the server's response
                 if response.status_code == 200:
-                    print(f"➡️  Sent: {message} | ✅ Server OK")
+                    print(f"➡️  Sent: {json.dumps(data_dict)} | ✅ Server OK")
                 else:
                     # Print an error if the server responded with a non-200 status
-                    print(f"➡️  Sent: {message} | ❌ Server responded with {response.status_code}: {response.text}")
+                    print(f"➡️  Sent: {json.dumps(data_dict)} | ❌ Server responded with {response.status_code}: {response.text}")
 
                 # Stagger the updates for each boat slightly
                 time.sleep(0.5)
