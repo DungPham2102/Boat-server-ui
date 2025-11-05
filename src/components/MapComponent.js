@@ -42,6 +42,7 @@ const MapComponent = ({
   const targetHeadingLineRef = useRef(null);
   const radarLinesRef = useRef([]);
   const animationFrameRef = useRef(null);
+  const radarAngleRef = useRef(0); // To persist angle between re-renders
 
   const onMapClickRef = useRef(onMapClick);
   useEffect(() => {
@@ -123,30 +124,11 @@ const MapComponent = ({
     });
   }, [boatsData, onBoatSelect]);
 
-  // --- Update Selected Boat Visuals ---
+  // --- Update Selected Boat Visuals (Non-animated) ---
   useEffect(() => {
     if (!mapRef.current) return;
     const map = mapRef.current;
     const selectedData = boatsData[selectedBoatId];
-
-    const cleanupVisuals = () => {
-      if (selectionCircleRef.current)
-        selectionCircleRef.current.setStyle({ opacity: 0, fillOpacity: 0 });
-      if (currentHeadingLineRef.current)
-        map.removeLayer(currentHeadingLineRef.current);
-      if (targetHeadingLineRef.current)
-        map.removeLayer(targetHeadingLineRef.current);
-      radarCirclesRef.current.forEach((c) => map.removeLayer(c));
-      if (animationFrameRef.current)
-        cancelAnimationFrame(animationFrameRef.current);
-      radarLinesRef.current.forEach((l) => map.removeLayer(l));
-
-      currentHeadingLineRef.current = null;
-      targetHeadingLineRef.current = null;
-      radarCirclesRef.current = [];
-      animationFrameRef.current = null;
-      radarLinesRef.current = [];
-    };
 
     if (selectedData) {
       const { lat, lon, head, targetHead } = selectedData;
@@ -201,51 +183,80 @@ const MapComponent = ({
       } else {
         targetHeadingLineRef.current.setLatLngs([latLng, targetHeadingEnd]);
       }
-
-      // Start radar animation if not running
-      if (!animationFrameRef.current) {
-        let angle = 0;
-        const updateRadarAnimation = () => {
-          const currentBoatMarker = boatMarkersRef.current.get(selectedBoatId);
-          if (!mapRef.current || !currentBoatMarker) {
-            cleanupVisuals();
-            return;
-          }
-
-          const currentCenter = currentBoatMarker.getLatLng();
-          const newPosition = rotateLine(angle, [
-            currentCenter.lat,
-            currentCenter.lng,
-          ]);
-          const radarLine = L.polyline([currentCenter, newPosition], {
-            color: "rgb(136, 244, 60)",
-            weight: 1,
-            opacity: 1.0,
-          }).addTo(map);
-          radarLinesRef.current.push(radarLine);
-
-          radarLinesRef.current = radarLinesRef.current.filter((line) => {
-            const currentOpacity = line.options.opacity - 0.05;
-            if (currentOpacity <= 0) {
-              map.removeLayer(line);
-              return false;
-            }
-            line.setStyle({ opacity: currentOpacity });
-            return true;
-          });
-
-          angle = (angle + 1) % 360;
-          animationFrameRef.current =
-            requestAnimationFrame(updateRadarAnimation);
-        };
-        animationFrameRef.current = requestAnimationFrame(updateRadarAnimation);
-      }
     } else {
-      cleanupVisuals();
+      // No boat selected, so clean up static visuals
+      if (selectionCircleRef.current) {
+        selectionCircleRef.current.setStyle({ opacity: 0, fillOpacity: 0 });
+      }
+      if (currentHeadingLineRef.current) {
+        map.removeLayer(currentHeadingLineRef.current);
+        currentHeadingLineRef.current = null;
+      }
+      if (targetHeadingLineRef.current) {
+        map.removeLayer(targetHeadingLineRef.current);
+        targetHeadingLineRef.current = null;
+      }
+      radarCirclesRef.current.forEach((c) => map.removeLayer(c));
+      radarCirclesRef.current = [];
     }
-
-    return cleanupVisuals; // Cleanup on re-render or unmount
   }, [selectedBoatId, boatsData, rotateLine]);
+
+  // --- Radar Animation Effect ---
+  useEffect(() => {
+    if (!mapRef.current || !selectedBoatId) {
+      return; // No animation if no boat is selected
+    }
+    const map = mapRef.current;
+
+    const updateRadarAnimation = () => {
+      const currentBoatMarker = boatMarkersRef.current.get(selectedBoatId);
+      // Stop if boat is gone or map is removed
+      if (!currentBoatMarker || !mapRef.current) {
+        return;
+      }
+
+      const currentCenter = currentBoatMarker.getLatLng();
+      const newPosition = rotateLine(radarAngleRef.current, [
+        currentCenter.lat,
+        currentCenter.lng,
+      ]);
+      const radarLine = L.polyline([currentCenter, newPosition], {
+        color: "rgb(136, 244, 60)",
+        weight: 1,
+        opacity: 1.0,
+      }).addTo(map);
+      radarLinesRef.current.push(radarLine);
+
+      // Fade out and remove old lines
+      radarLinesRef.current = radarLinesRef.current.filter((line) => {
+        const currentOpacity = line.options.opacity - 0.05;
+        if (currentOpacity <= 0) {
+          map.removeLayer(line);
+          return false;
+        }
+        line.setStyle({ opacity: currentOpacity });
+        return true;
+      });
+
+      radarAngleRef.current = (radarAngleRef.current + 1) % 360;
+      animationFrameRef.current = requestAnimationFrame(updateRadarAnimation);
+    };
+
+    // Start the animation
+    animationFrameRef.current = requestAnimationFrame(updateRadarAnimation);
+
+    // Cleanup function for when the selected boat changes or component unmounts
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+      // Clean up any remaining animation lines
+      radarLinesRef.current.forEach((l) => map.removeLayer(l));
+      radarLinesRef.current = [];
+      radarAngleRef.current = 0; // Reset angle for the next selection
+    };
+  }, [selectedBoatId, rotateLine]); // Only re-run when the boat selection changes
 
   // --- Recenter Map Effect ---
   useEffect(() => {
@@ -265,12 +276,10 @@ const MapComponent = ({
     if (!mapRef.current) return;
     const map = mapRef.current;
 
-    // Remove the old marker if it exists
     if (clickedLocationMarkerRef.current) {
       map.removeLayer(clickedLocationMarkerRef.current);
     }
 
-    // If new coordinates are provided, create a new marker
     if (clickedCoords) {
       const newMarker = L.marker([clickedCoords.lat, clickedCoords.lng], {
         icon: defaultIcon,
