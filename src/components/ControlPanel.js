@@ -1,7 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
-const ControlPanel = ({ initialData, onSend }) => {
+const ControlPanel = ({ initialData, onSend, clickedCoords }) => {
   const [controls, setControls] = useState(initialData);
+
+  useEffect(() => {
+    if (clickedCoords) {
+      setControls((prev) => ({ ...prev, targetLat: clickedCoords.lat, targetLon: clickedCoords.lng }));
+    }
+  }, [clickedCoords]);
 
   const handleChange = (e) => {
     const { id, value } = e.target;

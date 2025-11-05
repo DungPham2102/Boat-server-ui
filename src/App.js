@@ -21,6 +21,11 @@ function App() {
   const [serverIp, setServerIp] = useState(window.location.hostname);
   const [ipInput, setIpInput] = useState(window.location.hostname);
   const [recenter, setRecenter] = useState(0);
+  const [clickedCoords, setClickedCoords] = useState(null);
+
+  const handleMapClick = (coords) => {
+    setClickedCoords(coords);
+  };
 
   // Check for a token in localStorage on initial render
   useEffect(() => {
@@ -271,6 +276,8 @@ function App() {
             selectedBoatId={selectedBoatId}
             recenter={recenter}
             onBoatSelect={setSelectedBoatId} // Allow map to change selected boat
+            onMapClick={handleMapClick}
+            clickedCoords={clickedCoords}
           />
           <button onClick={() => setRecenter(c => c + 1)} style={{ marginTop: '-2px', padding: '10px 20px' }}>
             Center on Selected Boat
@@ -287,6 +294,7 @@ function App() {
           }}
           onSend={sendDataToWebSocket}
           disabled={!selectedBoatId} // Disable panel if no boat is selected
+          clickedCoords={clickedCoords}
         />
         <BoatManager boats={boats} setBoats={setBoats} serverIp={serverIp} token={token} />
       </div>

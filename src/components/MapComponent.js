@@ -4,6 +4,12 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
 // --- Icon Setup ---
+const boatIcon = L.icon({
+  iconUrl: "/boat-icon.png", // Path to your icon in the public folder
+  iconSize: [48, 48], // Adjust size as needed
+  iconAnchor: [16, 16], // Adjust anchor to the center of the icon
+});
+
 // @ts-ignore
 delete L.Icon.Default.prototype._getIconUrl;
 const defaultIcon = L.icon({
@@ -17,9 +23,17 @@ const defaultIcon = L.icon({
 });
 L.Icon.Default.mergeOptions({ icon: defaultIcon });
 
-const MapComponent = ({ boatsData, selectedBoatId, recenter, onBoatSelect }) => {
+const MapComponent = ({
+  boatsData,
+  selectedBoatId,
+  recenter,
+  onBoatSelect,
+  onMapClick,
+  clickedCoords,
+}) => {
   const mapRef = useRef(null);
   const boatMarkersRef = useRef(new Map());
+  const clickedLocationMarkerRef = useRef(null);
 
   // Refs for selected boat's visual effects
   const selectionCircleRef = useRef(null);
@@ -46,12 +60,20 @@ const MapComponent = ({ boatsData, selectedBoatId, recenter, onBoatSelect }) => 
     mapRef.current = map;
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       maxZoom: 20,
     }).addTo(map);
 
+    map.on("click", (e) => {
+      if (onMapClick) {
+        onMapClick(e.latlng);
+      }
+    });
+
     return () => {
-      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+      if (animationFrameRef.current)
+        cancelAnimationFrame(animationFrameRef.current);
       if (mapRef.current) mapRef.current.remove();
     };
   }, []);
@@ -65,7 +87,12 @@ const MapComponent = ({ boatsData, selectedBoatId, recenter, onBoatSelect }) => 
 
     incomingBoatIds.forEach((boatId) => {
       const boatData = boatsData[boatId];
-      if (!boatData || typeof boatData.lat !== 'number' || typeof boatData.lon !== 'number') return;
+      if (
+        !boatData ||
+        typeof boatData.lat !== "number" ||
+        typeof boatData.lon !== "number"
+      )
+        return;
 
       const latLng = [boatData.lat, boatData.lon];
       const marker = boatMarkersRef.current.get(boatId);
@@ -73,13 +100,15 @@ const MapComponent = ({ boatsData, selectedBoatId, recenter, onBoatSelect }) => 
       if (marker) {
         marker.setLatLng(latLng);
       } else {
-        const newMarker = L.marker(latLng, { icon: defaultIcon }).addTo(map);
+        const newMarker = L.marker(latLng, { icon: boatIcon }).addTo(map);
         newMarker.on("click", () => onBoatSelect(boatId));
         boatMarkersRef.current.set(boatId, newMarker);
       }
     });
 
-    const boatIdsToRemove = currentMarkerIds.filter((id) => !incomingBoatIds.includes(id));
+    const boatIdsToRemove = currentMarkerIds.filter(
+      (id) => !incomingBoatIds.includes(id)
+    );
     boatIdsToRemove.forEach((boatId) => {
       const markerToRemove = boatMarkersRef.current.get(boatId);
       if (markerToRemove) {
@@ -96,11 +125,15 @@ const MapComponent = ({ boatsData, selectedBoatId, recenter, onBoatSelect }) => 
     const selectedData = boatsData[selectedBoatId];
 
     const cleanupVisuals = () => {
-      if (selectionCircleRef.current) selectionCircleRef.current.setStyle({ opacity: 0, fillOpacity: 0 });
-      if (currentHeadingLineRef.current) map.removeLayer(currentHeadingLineRef.current);
-      if (targetHeadingLineRef.current) map.removeLayer(targetHeadingLineRef.current);
+      if (selectionCircleRef.current)
+        selectionCircleRef.current.setStyle({ opacity: 0, fillOpacity: 0 });
+      if (currentHeadingLineRef.current)
+        map.removeLayer(currentHeadingLineRef.current);
+      if (targetHeadingLineRef.current)
+        map.removeLayer(targetHeadingLineRef.current);
       radarCirclesRef.current.forEach((c) => map.removeLayer(c));
-      if (animationFrameRef.current) cancelAnimationFrame(animationFrameRef.current);
+      if (animationFrameRef.current)
+        cancelAnimationFrame(animationFrameRef.current);
       radarLinesRef.current.forEach((l) => map.removeLayer(l));
 
       currentHeadingLineRef.current = null;
@@ -116,15 +149,27 @@ const MapComponent = ({ boatsData, selectedBoatId, recenter, onBoatSelect }) => 
 
       // Update selection circle
       if (!selectionCircleRef.current) {
-        selectionCircleRef.current = L.circle(latLng, { color: "#00f", fillColor: "#00f", fillOpacity: 0.2, radius: 20 }).addTo(map);
+        selectionCircleRef.current = L.circle(latLng, {
+          color: "#00f",
+          fillColor: "#00f",
+          fillOpacity: 0.2,
+          radius: 20,
+        }).addTo(map);
       } else {
-        selectionCircleRef.current.setLatLng(latLng).setStyle({ opacity: 1, fillOpacity: 0.2 });
+        selectionCircleRef.current
+          .setLatLng(latLng)
+          .setStyle({ opacity: 1, fillOpacity: 0.2 });
       }
 
       // Update radar circles
       if (radarCirclesRef.current.length === 0) {
         [75, 50, 25].forEach((radius) => {
-          const circle = L.circle(latLng, { color: "rgb(131, 222, 70)", fillColor: "rgb(43, 75, 37)", fillOpacity: 0.4, radius }).addTo(map);
+          const circle = L.circle(latLng, {
+            color: "rgb(131, 222, 70)",
+            fillColor: "rgb(43, 75, 37)",
+            fillOpacity: 0.4,
+            radius,
+          }).addTo(map);
           radarCirclesRef.current.push(circle);
         });
       } else {
@@ -134,14 +179,20 @@ const MapComponent = ({ boatsData, selectedBoatId, recenter, onBoatSelect }) => 
       // Update heading lines
       const currentHeadingEnd = rotateLine(head, latLng);
       if (!currentHeadingLineRef.current) {
-        currentHeadingLineRef.current = L.polyline([latLng, currentHeadingEnd], { color: "yellow", weight: 3 }).addTo(map);
+        currentHeadingLineRef.current = L.polyline(
+          [latLng, currentHeadingEnd],
+          { color: "yellow", weight: 3 }
+        ).addTo(map);
       } else {
         currentHeadingLineRef.current.setLatLngs([latLng, currentHeadingEnd]);
       }
 
       const targetHeadingEnd = rotateLine(targetHead, latLng);
       if (!targetHeadingLineRef.current) {
-        targetHeadingLineRef.current = L.polyline([latLng, targetHeadingEnd], { color: "red", weight: 3 }).addTo(map);
+        targetHeadingLineRef.current = L.polyline([latLng, targetHeadingEnd], {
+          color: "red",
+          weight: 3,
+        }).addTo(map);
       } else {
         targetHeadingLineRef.current.setLatLngs([latLng, targetHeadingEnd]);
       }
@@ -157,8 +208,15 @@ const MapComponent = ({ boatsData, selectedBoatId, recenter, onBoatSelect }) => 
           }
 
           const currentCenter = currentBoatMarker.getLatLng();
-          const newPosition = rotateLine(angle, [currentCenter.lat, currentCenter.lng]);
-          const radarLine = L.polyline([currentCenter, newPosition], { color: "rgb(136, 244, 60)", weight: 1, opacity: 1.0 }).addTo(map);
+          const newPosition = rotateLine(angle, [
+            currentCenter.lat,
+            currentCenter.lng,
+          ]);
+          const radarLine = L.polyline([currentCenter, newPosition], {
+            color: "rgb(136, 244, 60)",
+            weight: 1,
+            opacity: 1.0,
+          }).addTo(map);
           radarLinesRef.current.push(radarLine);
 
           radarLinesRef.current = radarLinesRef.current.filter((line) => {
@@ -172,7 +230,8 @@ const MapComponent = ({ boatsData, selectedBoatId, recenter, onBoatSelect }) => 
           });
 
           angle = (angle + 1) % 360;
-          animationFrameRef.current = requestAnimationFrame(updateRadarAnimation);
+          animationFrameRef.current =
+            requestAnimationFrame(updateRadarAnimation);
         };
         animationFrameRef.current = requestAnimationFrame(updateRadarAnimation);
       }
@@ -185,11 +244,35 @@ const MapComponent = ({ boatsData, selectedBoatId, recenter, onBoatSelect }) => 
 
   // --- Recenter Map Effect ---
   useEffect(() => {
-    if (recenter > 0 && mapRef.current && selectedBoatId && boatsData[selectedBoatId]) {
+    if (
+      recenter > 0 &&
+      mapRef.current &&
+      selectedBoatId &&
+      boatsData[selectedBoatId]
+    ) {
       const { lat, lon } = boatsData[selectedBoatId];
       mapRef.current.panTo([lat, lon]);
     }
   }, [recenter, selectedBoatId]);
+
+  // --- Update Clicked Location Marker ---
+  useEffect(() => {
+    if (!mapRef.current) return;
+    const map = mapRef.current;
+
+    // Remove the old marker if it exists
+    if (clickedLocationMarkerRef.current) {
+      map.removeLayer(clickedLocationMarkerRef.current);
+    }
+
+    // If new coordinates are provided, create a new marker
+    if (clickedCoords) {
+      const newMarker = L.marker([clickedCoords.lat, clickedCoords.lng], {
+        icon: defaultIcon,
+      }).addTo(map);
+      clickedLocationMarkerRef.current = newMarker;
+    }
+  }, [clickedCoords]);
 
   return <div id="map"></div>;
 };
