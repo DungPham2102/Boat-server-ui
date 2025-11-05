@@ -43,6 +43,11 @@ const MapComponent = ({
   const radarLinesRef = useRef([]);
   const animationFrameRef = useRef(null);
 
+  const onMapClickRef = useRef(onMapClick);
+  useEffect(() => {
+    onMapClickRef.current = onMapClick;
+  }, [onMapClick]);
+
   const rotateLine = useCallback((angle, centerCoord) => {
     const radius = 75 / 111000;
     const angleRad = angle * (Math.PI / 180);
@@ -66,8 +71,8 @@ const MapComponent = ({
     }).addTo(map);
 
     map.on("click", (e) => {
-      if (onMapClick) {
-        onMapClick(e.latlng);
+      if (onMapClickRef.current) {
+        onMapClickRef.current(e.latlng);
       }
     });
 
@@ -253,7 +258,7 @@ const MapComponent = ({
       const { lat, lon } = boatsData[selectedBoatId];
       mapRef.current.panTo([lat, lon]);
     }
-  }, [recenter, selectedBoatId]);
+  }, [recenter, selectedBoatId, boatsData]);
 
   // --- Update Clicked Location Marker ---
   useEffect(() => {
