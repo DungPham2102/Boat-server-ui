@@ -1,110 +1,86 @@
 # GPS-based Boat Control System
 
-This project contains the main server and web interface for a real-time boat tracking and control system.
+This project contains the main server and web interface for a real-time boat tracking and control system capable of managing multiple gateways.
 
 ## System Architecture
 
 The system operates based on the following model:
 
 1.  **Boat Device**: Equipped with a GPS module and a LoRa transceiver.
+    -   **Upstream:** It continuously broadcasts its GPS coordinates and status (telemetry) via LoRa signals.
+    -   **Downstream:** It listens for, receives, and executes control commands sent from its assigned Gateway.
 
-    - **Upstream:** It continuously broadcasts its GPS coordinates and status (telemetry) via LoRa signals.
-    - **Downstream:** It listens for, receives, and executes control commands sent from the Gateway.
-
-2.  **Raspberry Pi (Gateway)**: A device with a LoRa transceiver running a dedicated script.
-
-    - **Upstream:** It listens for LoRa signals from the boat and forwards the data by sending an HTTP POST request to the Laptop Server.
-    - **Downstream:** It provides an API endpoint to receive commands from the Laptop Server and transmits them to the boat via LoRa.
+2.  **Raspberry Pi (Gateway)**: One or more devices with a LoRa transceiver, each with a unique ID and IP address.
+    -   **Upstream:** It listens for LoRa signals from boats and forwards the data by sending an HTTP POST request to the Laptop Server.
+    -   **Downstream:** It provides an API endpoint to receive commands from the Laptop Server and transmits them to the specific boat via LoRa.
 
 3.  **Laptop Server (This Project)**: A Node.js application that:
-
-    - **Upstream:** Provides an API to receive telemetry data from the Gateway, processes it, saves it to a database, and pushes it to the browser via WebSocket.
-    - **Downstream:** Receives control commands from the browser via WebSocket, saves them to a database, and forwards them to the Gateway by sending an HTTP POST request.
-    - Serves the React-based user interface and handles user authentication.
+    -   Manages a database of boats and gateways, including the relationship between them.
+    -   **Upstream:** Provides an API to receive telemetry data, processes it, saves it to a database, and pushes it (enriched with gateway info) to the browser via WebSocket.
+    -   **Downstream:** Receives control commands from the browser via WebSocket. It dynamically looks up the correct gateway IP address for the target boat, saves the command to a database, and forwards it to the appropriate gateway.
+    -   Serves the React-based user interface, handles user authentication, and provides an API for managing boats and gateways.
 
 4.  **Web Browser (Client)**: The React application running in the user's browser.
-    - **Upstream:** Loads the UI, establishes a WebSocket connection, and displays the boat's live position and status.
-    - **Downstream:** Captures user input (e.g., setting a new target) and sends these commands to the Laptop Server via WebSocket.
+    -   Provides a UI to manage boats and assign them to different gateways.
+    -   Loads the UI, establishes a WebSocket connection, and displays the boats' live positions and statuses, including which gateway is managing them.
+    -   Captures user input (e.g., setting a new target) and sends these commands to the Laptop Server via WebSocket.
 
 ---
 
 # Data Formats
 
-To ensure the system operates correctly, components communicating with the Node.js server must adhere to the following JSON formats.
-
 ### 1. Telemetry Data from Gateway to Server
 
-This is the data flow from the boat's device, through the Gateway, which is sent to the server's `/api/telemetry` endpoint via an HTTP `POST` request.
+Data sent from a Gateway to the server's `/api/telemetry` endpoint via HTTP `POST`.
 
-**Required Format:**
+-   **Content-Type**: `application/json`
+-   **Body**:
+    ```json
+    {
+      "boatId": "string",
+      "lat": number,
+      "lon": number,
+      "head": number,
+      "targetHead": number,
+      "leftSpeed": number,
+      "rightSpeed": number
+    }
+    ```
 
-- **Content-Type**: `application/json`
-- **Body**:
-  ```json
-  {
-    "boatId": "string",
-    "lat": number,
-    "lon": number,
-    "head": number,
-    "targetHead": number,
-    "leftSpeed": number,
-    "rightSpeed": number
-  }
-  ```
+### 2. Telemetry Data from Server to UI (WebSocket)
 
-**Important Notes:**
-- `boatId` must be a string.
-- All other fields (`lat`, `lon`, `head`, etc.) must be of type number, **not** enclosed in quotes.
+This is the enriched data broadcasted from the server to the UI. Note the addition of `gateway_id`.
 
-**Example:**
-```json
-{
-  "boatId": "00001",
-  "lat": 21.038737,
-  "lon": 105.782458,
-  "head": 45.5,
-  "targetHead": 50,
-  "leftSpeed": 1510,
-  "rightSpeed": 1510
-}
-```
+-   **Format**: JSON string
+-   **Contents**:
+    ```json
+    {
+      "boatId": "string",
+      "lat": number,
+      "lon": number,
+      "head": number,
+      "targetHead": number,
+      "leftSpeed": number,
+      "rightSpeed": number,
+      "gateway_id": "string"
+    }
+    ```
 
-### 2. Control Commands from User Interface (UI) to Server
+### 3. Control Commands from UI to Server (WebSocket)
 
-This is the data flow sent from the browser (UI) to the server via a WebSocket connection when a user sends a control command.
-
-**Required Format:**
-
-- The data is a JSON string.
-- **Contents of the parsed JSON string:**
-  ```json
-  {
-    "boatId": "string",
-    "speed": number,
-    "targetLat": number,
-    "targetLon": number,
-    "kp": number,
-    "ki": number,
-    "kd": number
-  }
-  ```
-
-**Important Notes:**
-- `boatId` must be a string.
-- The control fields (`speed`, `targetLat`, `kp`, etc.) must be of type number.
-
-**Example:**
-```json
-{
-  "boatId": "00001",
-  "speed": 1550,
-  "targetLat": 21.689426,
-  "targetLon": 102.092629,
-  "kp": 1.0,
-  "ki": 0.1,
-  "kd": 0.05
-}
-```
+-   **Format**: JSON string
+-   **Contents**:
+    ```json
+    {
+      "boatId": "string",
+      "speed": number,
+      "targetLat": number,
+      "targetLon": number,
+      "kp": number,
+      "ki": number,
+      "kd": number
+    }
+    ```
 
 ---
 
@@ -114,48 +90,60 @@ This is the data flow sent from the browser (UI) to the server via a WebSocket c
 
 ### Prerequisites
 
-Before you begin, ensure you have the following installed:
-
-- **Node.js**: This project requires Node.js version `20.19.2`. Using other versions may cause issues during dependency installation.
-- **npm**: Node Package Manager, which is included with Node.js.
+-   **Node.js**: Version `20.19.2` or compatible.
+-   **npm**: Included with Node.js.
+-   **MySQL**: A running MySQL server instance.
 
 ### Database
 
-First, set up your MySQL database. Execute the following SQL commands to create the database and the required tables.
+Execute the following SQL script in your MySQL client. This will create the database, all necessary tables with the correct structure, and optional sample data.
 
 #### 1. Create Database User (Required)
 
-Before creating the tables, you need a dedicated MySQL user for the application. Run these commands in your MySQL client:
+First, ensure you have a MySQL user for the application.
 
 ```sql
--- 1. Create user 'admin' to connect from localhost, using the old authentication method and setting a password.
+-- Create user 'admin' with a password.
 CREATE USER 'admin'@'localhost' IDENTIFIED WITH 'mysql_native_password' BY 'password';
 
--- 2. Grant all privileges (like root) to user 'admin' on all databases.
+-- Grant all privileges to the user.
 GRANT ALL PRIVILEGES ON *.* TO 'admin'@'localhost' WITH GRANT OPTION;
 
--- 3. Reload the grant tables for the changes to take effect immediately.
+-- Reload privileges.
 FLUSH PRIVILEGES;
 ```
 
-> **Note:** Remember to use the same credentials (`admin` and `password`) in your `.env` file later.
+> **Note:** Remember to use these credentials in your `.env` file.
 
 #### 2. Create Database and Tables
 
-Now, execute the following SQL commands to create the database and tables:
+This script sets up the entire database structure.
 
 ```sql
--- Create the database
-CREATE DATABASE boat_db;
+-- Create the database if it doesn't exist
+CREATE DATABASE IF NOT EXISTS boat_db;
 
 -- Switch to the new database
 USE boat_db;
 
--- Create the table for boats
+-- Create the table for gateways
+CREATE TABLE gateways (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    gatewayId VARCHAR(255) NOT NULL UNIQUE,
+    name VARCHAR(255),
+    ip_address VARCHAR(255) NOT NULL
+);
+
+-- Create the table for boats, with a foreign key to gateways
 CREATE TABLE boats (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    boatId VARCHAR(255) NOT NULL UNIQUE
+    boatId VARCHAR(255) NOT NULL UNIQUE,
+    gateway_id VARCHAR(255), -- This links to gateways.gatewayId
+    CONSTRAINT fk_gateway
+        FOREIGN KEY (gateway_id) 
+        REFERENCES gateways(gatewayId) 
+        ON DELETE SET NULL
 );
 
 -- Create the table for user accounts
@@ -166,7 +154,7 @@ CREATE TABLE users (
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Create the table for telemetry logs (data from boats)
+-- Create the table for telemetry logs
 CREATE TABLE telemetry_logs (
   id INT AUTO_INCREMENT PRIMARY KEY,
   boat_id VARCHAR(255) NOT NULL,
@@ -180,7 +168,7 @@ CREATE TABLE telemetry_logs (
   FOREIGN KEY (boat_id) REFERENCES boats(boatId) ON DELETE CASCADE
 );
 
--- Create the table for command logs (data to boats)
+-- Create the table for command logs
 CREATE TABLE command_logs (
   id INT AUTO_INCREMENT PRIMARY KEY,
   boat_id VARCHAR(255) NOT NULL,
@@ -195,21 +183,22 @@ CREATE TABLE command_logs (
   FOREIGN KEY (boat_id) REFERENCES boats(boatId) ON DELETE CASCADE,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
-```
 
-You can add optional sample data for boats:
+-- --- OPTIONAL SAMPLE DATA ---
 
-```sql
-INSERT INTO boats (name, boatId) VALUES ('Boat 1', '00001');
+-- Add a sample gateway
+INSERT INTO gateways (gatewayId, name, ip_address) VALUES ('GW001', 'Main Gateway', '192.168.1.100');
+
+-- Add a sample boat and assign it to the gateway 'GW001'
+INSERT INTO boats (name, boatId, gateway_id) VALUES ('Boat 1', '00001', 'GW001');
+
+-- Add another sample boat without an assigned gateway
 INSERT INTO boats (name, boatId) VALUES ('Boat 2', '00002');
 ```
 
 ### Configuration
 
-Before starting the server, you must create a `.env` file in the root of the project to store necessary credentials. This is a mandatory step.
-
-1.  Create a file named `.env` in the project root.
-2.  Copy the following template into it and replace the values with your own credentials.
+Create a `.env` file in the project root with the following content. **This is a mandatory step.**
 
 ```
 # JWT Secret for signing authentication tokens
@@ -217,82 +206,59 @@ JWT_SECRET="your-super-secret-key-that-is-long-and-random"
 
 # MySQL Database Connection
 DB_HOST="localhost"
-DB_USER="your_db_user"
-DB_PASSWORD="your_db_password"
+DB_USER="your_db_user"      # e.g., admin
+DB_PASSWORD="your_db_password"  # e.g., password
 DB_DATABASE="boat_db"
 ```
-
-> **Note:** The server will not start correctly if this file is missing or if any of the variables are not set.
 
 ### Install Dependencies
 
 In the project root, run:
-
 ```bash
 npm install
 ```
 
-### Configure Gateway Connection
+### Gateway Management
 
-To send commands from the UI to the boat, the server needs to know the IP address of the Raspberry Pi Gateway.
-
-- **File**: `server.js`
-- **Function**: `forwardCommandToGateway`
-- **Variable**: `const gatewayIp`
-
-You must configure this IP address to match your Raspberry Pi's static IP. For example:
-
-```javascript
-const gatewayIp = "192.168.1.100"; // <-- Replace with your Pi's actual IP
-```
+Gateway IP addresses are no longer hard-coded. You must add and manage your gateways in the database. You can do this via a MySQL client or by building a UI for it. The sample data above shows how to add a gateway. The server will dynamically use the IP address from the `gateways` table when sending commands to a boat.
 
 ---
 
 ## 2. Running the Application
 
-You can run this application in two modes: Development or Production.
-
 ### Development Environment
 
-**Purpose:** For coding, testing new features, and debugging. Requires up to **3 separate terminals**.
+Requires **2 separate terminals**.
 
 1.  **Run the Backend Server (Terminal 1):**
     Starts the API server on `http://localhost:3001`.
-
     ```bash
     node server.js
     ```
 
 2.  **Run the Frontend Server (Terminal 2):**
     Starts the React development server on `http://localhost:3000` with hot-reloading.
-
     ```bash
     npm start
     ```
 
-### 3.  **Register Your First User:**
-    Before you can log in, you must create a user account. You can do this directly from the login page of the application.
+3.  **Register & Log In:**
+    Before you can use the app, you must create a user account from the login page.
 
-**To use the app, open your browser to `http://localhost:3000` and log in with the credentials you just registered.**
+**Open your browser to `http://localhost:3000` and log in.**
 
 ### Production Environment
 
-**Purpose:** For deploying the final, optimized version of the application.
-
-1.  **Build the Frontend Application:**
-    This command bundles the React app into static files in a `build` directory. You only need to run this when you have made changes to the frontend code (`src` folder).
-
+1.  **Build the Frontend:**
+    This bundles the React app into static files in the `build` directory.
     ```bash
     npm run build
     ```
 
-2.  **Register a User (If you haven't already):**
-    If you haven't created a user account yet, you can do so from the login page.
-
-3.  **Run the Production Server:**
-    This single command starts the server on `http://localhost:3001`, serving both the API and the optimized frontend application.
+2.  **Run the Production Server:**
+    This single command serves both the API and the static frontend files.
     ```bash
     NODE_ENV=production node server.js
     ```
 
-**To use the app, open your browser to `http://localhost:3001` and log in.**
+**Open your browser to `http://localhost:3001` and log in.**
