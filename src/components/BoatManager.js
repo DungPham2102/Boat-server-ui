@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from "react";
 
-function BoatManager({ boats, setBoats, serverIp, token }) {
+function BoatManager({ boats, setBoats, serverIp, token, gateways }) {
   const [isEditing, setIsEditing] = useState(false);
   const [currentBoat, setCurrentBoat] = useState(null);
-  const [formData, setFormData] = useState({ name: "", boatId: "" });
+  const [formData, setFormData] = useState({ name: "", boatId: "", gateway_id: "" });
   const [notification, setNotification] = useState({ type: "", message: "" });
 
   const handleInputChange = (e) => {
@@ -36,7 +36,7 @@ function BoatManager({ boats, setBoats, serverIp, token }) {
       })
       .then((newBoat) => {
         setBoats([...boats, newBoat]);
-        setFormData({ name: "", boatId: "" });
+        setFormData({ name: "", boatId: "", gateway_id: "" });
         showNotification("success", "Boat added successfully!");
       })
       .catch(error => {
@@ -94,14 +94,14 @@ function BoatManager({ boats, setBoats, serverIp, token }) {
   const handleEditClick = (boat) => {
     setIsEditing(true);
     setCurrentBoat(boat);
-    setFormData({ name: boat.name, boatId: boat.boatId });
+    setFormData({ name: boat.name, boatId: boat.boatId, gateway_id: boat.gateway_id || "" });
     setNotification({ type: "", message: "" }); // Clear notification
   };
 
   const handleCancelEdit = () => {
     setIsEditing(false);
     setCurrentBoat(null);
-    setFormData({ name: "", boatId: "" });
+    setFormData({ name: "", boatId: "", gateway_id: "" });
     setNotification({ type: "", message: "" }); // Clear notification
   };
 
@@ -135,6 +135,18 @@ function BoatManager({ boats, setBoats, serverIp, token }) {
           onChange={handleInputChange}
           required
         />
+        <select
+          name="gateway_id"
+          value={formData.gateway_id}
+          onChange={handleInputChange}
+        >
+          <option value="">-- Unassigned --</option>
+          {gateways.map((gw) => (
+            <option key={gw.id} value={gw.gatewayId}>
+              {gw.name} ({gw.gatewayId})
+            </option>
+          ))}
+        </select>
         <button type="submit">{isEditing ? "Update Boat" : "Add Boat"}</button>
         {isEditing && (
           <button type="button" onClick={handleCancelEdit}>
@@ -152,6 +164,7 @@ function BoatManager({ boats, setBoats, serverIp, token }) {
           <tr>
             <th>Name</th>
             <th>Boat ID</th>
+            <th>Gateway</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -160,6 +173,7 @@ function BoatManager({ boats, setBoats, serverIp, token }) {
             <tr key={boat.id}>
               <td>{boat.name}</td>
               <td>{boat.boatId}</td>
+              <td>{boat.gateway_id || "N/A"}</td>
               <td className="boat-manager-actions">
                 <button onClick={() => handleEditClick(boat)}>Edit</button>
                 <button onClick={() => handleDelete(boat.id)}>Delete</button>

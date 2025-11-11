@@ -258,18 +258,23 @@ const MapComponent = ({
     };
   }, [selectedBoatId, rotateLine]); // Only re-run when the boat selection changes
 
+  const boatsDataRef = useRef(boatsData);
+  useEffect(() => {
+    boatsDataRef.current = boatsData;
+  }, [boatsData]);
+
   // --- Recenter Map Effect ---
   useEffect(() => {
     if (
       recenter > 0 &&
       mapRef.current &&
       selectedBoatId &&
-      boatsData[selectedBoatId]
+      boatsDataRef.current[selectedBoatId]
     ) {
-      const { lat, lon } = boatsData[selectedBoatId];
+      const { lat, lon } = boatsDataRef.current[selectedBoatId];
       mapRef.current.panTo([lat, lon]);
     }
-  }, [recenter, selectedBoatId, boatsData]);
+  }, [recenter, selectedBoatId]);
 
   // --- Update Clicked Location Marker ---
   useEffect(() => {

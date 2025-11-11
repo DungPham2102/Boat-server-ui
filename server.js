@@ -132,15 +132,67 @@ app.get("/api/boats", authenticateToken, (req, res) => {
   });
 });
 
+app.get("/api/gateways", authenticateToken, (req, res) => {
+  db.query("SELECT * FROM gateways", (err, results) => {
+    if (err) {
+      res.status(500).send(err);
+      return;
+    }
+    res.json(results);
+  });
+});
+
+// Add a new gateway
+app.post("/api/gateways", authenticateToken, (req, res) => {
+  const { name, gatewayId, ip_address } = req.body;
+  if (!name || !gatewayId || !ip_address) {
+    return res.status(400).json({ error: "Name, Gateway ID, and IP Address are required." });
+  }
+
+  db.query(
+    "INSERT INTO gateways (name, gatewayId, ip_address) VALUES (?, ?, ?)",
+    [name, gatewayId, ip_address],
+    (err, results) => {
+      if (err) {
+        if (err.code === "ER_DUP_ENTRY") {
+          return res.status(409).json({ error: `Gateway with ID '${gatewayId}' already exists.` });
+        }
+        console.error("Error inserting into database:", err);
+        return res.status(500).json({ error: "Internal server error" });
+      }
+      res.status(201).json({ id: results.insertId, name, gatewayId, ip_address });
+    }
+  );
+});
+
+// Delete a gateway
+app.delete("/api/gateways/:id", authenticateToken, (req, res) => {
+  const { id } = req.params;
+  db.query("DELETE FROM gateways WHERE id = ?", [id], (err, results) => {
+    if (err) {
+      console.error("Error deleting from database:", err);
+      return res.status(500).json({ error: "Internal server error" });
+    }
+    if (results.affectedRows === 0) {
+      return res.status(404).json({ error: "Gateway not found." });
+    }
+    res.status(204).send(); // No Content
+  });
+});
+
 // Add a new boat
 app.post("/api/boats", authenticateToken, (req, res) => {
-  const { name, boatId } = req.body;
+  const { name, boatId, gateway_id } = req.body; // Add gateway_id
   if (!name || !boatId) {
     return res.status(400).send("Name and Boat ID are required.");
   }
+
+  // If gateway_id is an empty string or undefined, treat it as NULL
+  const gatewayToSave = gateway_id || null;
+
   db.query(
-    "INSERT INTO boats (name, boatId) VALUES (?, ?)",
-    [name, boatId],
+    "INSERT INTO boats (name, boatId, gateway_id) VALUES (?, ?, ?)",
+    [name, boatId, gatewayToSave], // Add gatewayToSave to query
     (err, results) => {
       if (err) {
         if (err.code === "ER_DUP_ENTRY") {
@@ -151,7 +203,8 @@ app.post("/api/boats", authenticateToken, (req, res) => {
         console.error("Error inserting into database:", err);
         return res.status(500).json({ error: "Internal server error" });
       }
-      res.status(201).json({ id: results.insertId, name, boatId });
+      // Return the full new boat object, including the gateway_id
+      res.status(201).json({ id: results.insertId, name, boatId, gateway_id: gatewayToSave });
     }
   );
 });
@@ -159,13 +212,17 @@ app.post("/api/boats", authenticateToken, (req, res) => {
 // Update an existing boat
 app.put("/api/boats/:id", authenticateToken, (req, res) => {
   const { id } = req.params;
-  const { name, boatId } = req.body;
+  const { name, boatId, gateway_id } = req.body; // Add gateway_id
   if (!name || !boatId) {
     return res.status(400).send("Name and Boat ID are required.");
   }
+
+  // If gateway_id is an empty string or undefined, treat it as NULL
+  const gatewayToSave = gateway_id || null;
+
   db.query(
-    "UPDATE boats SET name = ?, boatId = ? WHERE id = ?",
-    [name, boatId, id],
+    "UPDATE boats SET name = ?, boatId = ?, gateway_id = ? WHERE id = ?",
+    [name, boatId, gatewayToSave, id], // Add gatewayToSave to query
     (err, results) => {
       if (err) {
         if (err.code === "ER_DUP_ENTRY") {
@@ -179,7 +236,8 @@ app.put("/api/boats/:id", authenticateToken, (req, res) => {
       if (results.affectedRows === 0) {
         return res.status(404).json({ error: "Boat not found." });
       }
-      res.json({ id: parseInt(id), name, boatId });
+      // Return the full updated boat object
+      res.json({ id: parseInt(id), name, boatId, gateway_id: gatewayToSave });
     }
   );
 });
@@ -222,39 +280,68 @@ console.log(
 
 // This function forwards a command to the Raspberry Pi Gateway
 function forwardCommandToGateway(boatId, commandData) {
-  // IMPORTANT: Replace 'RASPBERRY_PI_IP' with the actual IP of your Gateway.
-  // It is recommended to store this IP in the 'boats' table in your database.
-  const gatewayIp = "localhost"; // <--- THAY THẾ IP NÀY
   const gatewayPort = 5000; // Port for the Python server on the Gateway
 
-  // The commandData is now a JSON object, so we stringify it
-  const postData = JSON.stringify(commandData);
+  // 1. Find the gateway IP address for the given boatId
+  const query = `
+    SELECT g.ip_address
+    FROM boats AS b
+    JOIN gateways AS g ON b.gateway_id = g.gatewayId
+    WHERE b.boatId = ?
+  `;
 
-  const options = {
-    hostname: gatewayIp,
-    port: gatewayPort,
-    path: "/command",
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json", // Set content type to JSON
-      "Content-Length": Buffer.byteLength(postData),
-    },
-  };
+  db.query(query, [boatId], (err, results) => {
+    if (err) {
+      console.error(
+        `Database error while finding gateway for boat ${boatId}:`,
+        err
+      );
+      return;
+    }
 
-  const req = http.request(options, (res) => {
-    console.log(`GATEWAY RESPONSE STATUS: ${res.statusCode}`);
-    res.setEncoding("utf8");
-    res.on("data", (chunk) => {
-      console.log(`GATEWAY RESPONSE BODY: ${chunk}`);
+    if (results.length === 0) {
+      console.error(
+        `Could not find an assigned gateway for boat ${boatId}. Command not sent.`
+      );
+      return;
+    }
+
+    const gatewayIp = results[0].ip_address;
+    console.log(
+      `Found gateway IP ${gatewayIp} for boat ${boatId}. Forwarding command...`
+    );
+
+    // 2. Send the command to the found IP address
+    const postData = JSON.stringify(commandData);
+
+    const options = {
+      hostname: gatewayIp,
+      port: gatewayPort,
+      path: "/command",
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Content-Length": Buffer.byteLength(postData),
+      },
+    };
+
+    const req = http.request(options, (res) => {
+      console.log(`GATEWAY RESPONSE STATUS: ${res.statusCode}`);
+      res.setEncoding("utf8");
+      res.on("data", (chunk) => {
+        console.log(`GATEWAY RESPONSE BODY: ${chunk}`);
+      });
     });
-  });
 
-  req.on("error", (e) => {
-    console.error(`Error sending command to gateway: ${e.message}`);
-  });
+    req.on("error", (e) => {
+      console.error(
+        `Error sending command to gateway at ${gatewayIp}: ${e.message}`
+      );
+    });
 
-  req.write(postData);
-  req.end();
+    req.write(postData);
+    req.end();
+  });
 }
 
 wss.on("connection", (ws, req) => {
@@ -401,6 +488,7 @@ app.post("/api/telemetry", (req, res) => {
       }
 
       if (results.length > 0) {
+        const boatFromDb = results[0];
         // --- BEGIN: LOG TELEMETRY DATA ---
         const logQuery = `INSERT INTO telemetry_logs (boat_id, latitude, longitude, current_head, target_head, left_speed, right_speed) VALUES (?, ?, ?, ?, ?, ?, ?)`;
         const logValues = [
@@ -422,8 +510,10 @@ app.post("/api/telemetry", (req, res) => {
         // --- END: LOG TELEMETRY DATA ---
 
         // Construct the telemetry data object to be sent to the UI
-        // (The incoming data is already in the correct format)
-        const telemetryData = data;
+        const telemetryData = {
+          ...data, // Original telemetry data from the boat
+          gateway_id: boatFromDb.gateway_id, // Add gateway_id from the database
+        };
 
         // Get clients subscribed to this specific boat
         const specificSubscribers =

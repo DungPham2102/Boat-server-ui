@@ -5,6 +5,7 @@ import ControlPanel from "./components/ControlPanel";
 import MapComponent from "./components/MapComponent";
 import Console from "./components/Console";
 import BoatManager from "./components/BoatManager";
+import GatewayManager from "./components/GatewayManager";
 import Login from "./components/Login"; // Import the Login component
 import "./styles.css";
 
@@ -17,6 +18,7 @@ function App() {
 
   const [logs, setLogs] = useState([]);
   const [boats, setBoats] = useState([]); // List of boats from DB
+  const [gateways, setGateways] = useState([]); // List of gateways from DB
   const websocketRef = useRef(null);
   const [serverIp, setServerIp] = useState(window.location.hostname);
   const [ipInput, setIpInput] = useState(window.location.hostname);
@@ -29,23 +31,24 @@ function App() {
 
   // Check for a token in localStorage on initial render
   useEffect(() => {
-    const storedToken = localStorage.getItem('accessToken');
+    const storedToken = localStorage.getItem("accessToken");
     if (storedToken) {
       setToken(storedToken);
     }
   }, []);
 
   const handleLoginSuccess = (newToken) => {
-    localStorage.setItem('accessToken', newToken);
+    localStorage.setItem("accessToken", newToken);
     setToken(newToken);
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('accessToken');
+    localStorage.removeItem("accessToken");
     setToken(null);
     // Also clear other relevant state
     setBoatsData({});
     setBoats([]);
+    setGateways([]); // Clear gateways on logout
     setSelectedBoatId(null);
   };
 
@@ -57,14 +60,40 @@ function App() {
     setLogs((prev) => [...prev, `${new Date().toLocaleTimeString()}: ${msg}`]);
   }, []);
 
+  const fetchGateways = useCallback(() => {
+    if (!serverIp || !token) return;
+
+    fetch(`http://${serverIp}:3001/api/gateways`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+      .then(async (res) => {
+        if (res.ok) {
+          return res.json();
+        }
+        if (res.status === 401 || res.status === 403) {
+          handleLogout();
+        }
+        const errorText = await res.text();
+        throw new Error(errorText || "Failed to fetch gateways");
+      })
+      .then(setGateways)
+      .catch((err) => {
+        console.error("Error fetching gateways:", err);
+        appendLog(`Error fetching gateways: ${err.message}`);
+        setGateways([]);
+      });
+  }, [serverIp, token, appendLog]);
+
   // Fetch boat metadata from the API
   useEffect(() => {
     if (!serverIp || !token) return; // Don't fetch if not logged in
 
     fetch(`http://${serverIp}:3001/api/boats`, {
       headers: {
-        'Authorization': `Bearer ${token}`
-      }
+        Authorization: `Bearer ${token}`,
+      },
     })
       .then(async (res) => {
         if (res.ok) {
@@ -75,7 +104,7 @@ function App() {
           handleLogout();
         }
         const errorText = await res.text();
-        throw new Error(errorText || 'Failed to fetch boats');
+        throw new Error(errorText || "Failed to fetch boats");
       })
       .then(setBoats)
       .catch((err) => {
@@ -89,6 +118,10 @@ function App() {
       });
   }, [serverIp, token, appendLog]);
 
+  // Fetch gateway metadata from the API
+  useEffect(() => {
+    fetchGateways();
+  }, [fetchGateways]);
 
   // Setup WebSocket to listen for ALL boats
   useEffect(() => {
@@ -108,7 +141,16 @@ function App() {
         appendLog(`Received data: ${event.data}`);
         try {
           const data = JSON.parse(event.data);
-          const { boatId, lat, lon, head, targetHead, leftSpeed, rightSpeed } = data;
+          const {
+            boatId,
+            lat,
+            lon,
+            head,
+            targetHead,
+            leftSpeed,
+            rightSpeed,
+            gateway_id,
+          } = data;
 
           if (!boatId) {
             appendLog("Received data without boatId.");
@@ -125,6 +167,7 @@ function App() {
               targetHead: targetHead || 0,
               leftSpeed: leftSpeed || 1500,
               rightSpeed: rightSpeed || 1500,
+              gateway_id: gateway_id || null, // Save the gateway_id
             },
           }));
 
@@ -208,8 +251,17 @@ function App() {
       <Navbar onLogout={handleLogout} />
       <div className="app-container">
         <div className="websocket-configurator">
-          <div style={{ display: "flex", alignItems: "center", marginBottom: "10px" }}>
-            <label htmlFor="serverIpInput" style={{ marginRight: "5px", fontSize: "0.8em" }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              marginBottom: "10px",
+            }}
+          >
+            <label
+              htmlFor="serverIpInput"
+              style={{ marginRight: "5px", fontSize: "0.8em" }}
+            >
               Server IP:
             </label>
             <input
@@ -225,11 +277,21 @@ function App() {
                 fontSize: "0.8em",
               }}
             />
-            <button onClick={handleConnect} style={{ fontSize: "0.8em", padding: "5px 10px" }}>
+            <button
+              onClick={handleConnect}
+              style={{ fontSize: "0.8em", padding: "5px 10px" }}
+            >
               Connect
             </button>
-            
-            <label htmlFor="boatSelector" style={{ marginLeft: "20px", marginRight: "5px", fontSize: "0.8em" }}>
+
+            <label
+              htmlFor="boatSelector"
+              style={{
+                marginLeft: "20px",
+                marginRight: "5px",
+                fontSize: "0.8em",
+              }}
+            >
               Select Boat:
             </label>
             <select
@@ -262,6 +324,7 @@ function App() {
         <TelemetryPanel
           data={{
             "Selected Boat": selectedBoatDisplayName,
+            "Gateway ID": selectedBoatData.gateway_id || "N/A",
             Lat: selectedBoatData.lat,
             Lon: selectedBoatData.lon,
             "Current Head": selectedBoatData.head,
@@ -270,7 +333,13 @@ function App() {
             "Right Speed (pwm)": selectedBoatData.rightSpeed,
           }}
         />
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+          }}
+        >
           <MapComponent
             boatsData={boatsData} // Pass all boats' data
             selectedBoatId={selectedBoatId}
@@ -279,7 +348,10 @@ function App() {
             onMapClick={handleMapClick}
             clickedCoords={clickedCoords}
           />
-          <button onClick={() => setRecenter(c => c + 1)} style={{ marginTop: '-2px', padding: '10px 20px' }}>
+          <button
+            onClick={() => setRecenter((c) => c + 1)}
+            style={{ marginTop: "-2px", padding: "10px 20px" }}
+          >
             Center on Selected Boat
           </button>
         </div>
@@ -296,7 +368,19 @@ function App() {
           disabled={!selectedBoatId} // Disable panel if no boat is selected
           clickedCoords={clickedCoords}
         />
-        <BoatManager boats={boats} setBoats={setBoats} serverIp={serverIp} token={token} />
+        <BoatManager
+          boats={boats}
+          setBoats={setBoats}
+          serverIp={serverIp}
+          token={token}
+          gateways={gateways}
+        />
+        <GatewayManager
+          serverIp={serverIp}
+          token={token}
+          gateways={gateways}
+          setGateways={setGateways}
+        />
       </div>
       <Console logs={logs} />
     </div>
