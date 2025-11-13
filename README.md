@@ -7,100 +7,52 @@ This project contains the main server and web interface for a real-time boat tra
 The system operates based on the following model:
 
 1.  **Boat Device**: Equipped with a GPS module and a LoRa transceiver.
-    -   **Upstream:** It continuously broadcasts its GPS coordinates and status (telemetry) via LoRa signals.
-    -   **Downstream:** It listens for, receives, and executes control commands sent from its assigned Gateway.
+
+    - **Upstream:** It continuously broadcasts its GPS coordinates and status (telemetry) via LoRa signals.
+    - **Downstream:** It listens for, receives, and executes control commands sent from its assigned Gateway.
 
 2.  **Raspberry Pi (Gateway)**: One or more devices with a LoRa transceiver, each with a unique ID and IP address.
-    -   **Upstream:** It listens for LoRa signals from boats and forwards the data by sending an HTTP POST request to the Laptop Server.
-    -   **Downstream:** It provides an API endpoint to receive commands from the Laptop Server and transmits them to the specific boat via LoRa.
+
+    - **Upstream:** It listens for LoRa signals from boats and forwards the data by sending an HTTP POST request to the Laptop Server.
+    - **Downstream:** It provides an API endpoint to receive commands from the Laptop Server and transmits them to the specific boat via LoRa.
 
 3.  **Laptop Server (This Project)**: A Node.js application that:
-    -   Manages a database of boats and gateways, including the relationship between them.
-    -   **Upstream:** Provides an API to receive telemetry data, processes it, saves it to a database, and pushes it (enriched with gateway info) to the browser via WebSocket.
-    -   **Downstream:** Receives control commands from the browser via WebSocket. It dynamically looks up the correct gateway IP address for the target boat, saves the command to a database, and forwards it to the appropriate gateway.
-    -   Serves the React-based user interface, handles user authentication, and provides an API for managing boats and gateways.
 
-4.  **Web Browser (Client)**: The React application running in the user's browser.
-    -   Provides a UI to manage boats and assign them to different gateways.
-    -   Loads the UI, establishes a WebSocket connection, and displays the boats' live positions and statuses, including which gateway is managing them.
-    -   Captures user input (e.g., setting a new target) and sends these commands to the Laptop Server via WebSocket.
+    - Manages a database of boats and gateways.
+    - **Upstream:** Provides an API to receive telemetry data, saves it to the database, and pushes it to the browser via WebSocket.
+    - **Downstream:** Receives control commands from the browser via WebSocket and forwards them to the Fog Server.
+    - Serves the React-based user interface, handles user authentication, and provides an API for managing boats and gateways.
 
----
+4.  **Fog Server**: A central server responsible for routing commands.
 
-# Data Formats
+    - It receives control commands from the main Laptop Server.
+    - It looks up the correct Gateway IP address for the target boat.
+    - It forwards the command to the appropriate Gateway, which then sends it to the boat.
 
-### 1. Telemetry Data from Gateway to Server
-
-Data sent from a Gateway to the server's `/api/telemetry` endpoint via HTTP `POST`.
-
--   **Content-Type**: `application/json`
--   **Body**:
-    ```json
-    {
-      "boatId": "string",
-      "lat": number,
-      "lon": number,
-      "head": number,
-      "targetHead": number,
-      "leftSpeed": number,
-      "rightSpeed": number
-    }
-    ```
-
-### 2. Telemetry Data from Server to UI (WebSocket)
-
-This is the enriched data broadcasted from the server to the UI. Note the addition of `gateway_id`.
-
--   **Format**: JSON string
--   **Contents**:
-    ```json
-    {
-      "boatId": "string",
-      "lat": number,
-      "lon": number,
-      "head": number,
-      "targetHead": number,
-      "leftSpeed": number,
-      "rightSpeed": number,
-      "gateway_id": "string"
-    }
-    ```
-
-### 3. Control Commands from UI to Server (WebSocket)
-
--   **Format**: JSON string
--   **Contents**:
-    ```json
-    {
-      "boatId": "string",
-      "speed": number,
-      "targetLat": number,
-      "targetLon": number,
-      "kp": number,
-      "ki": number,
-      "kd": number
-    }
-    ```
+5.  **Web Browser (Client)**: The React application running in the user's browser.
+    - Provides a UI to manage boats and assign them to different gateways.
+    - Displays live boat positions and statuses.
+    - Captures user input (e.g., setting a new target) and sends commands to the Laptop Server via WebSocket.
 
 ---
 
 # Project Setup and Running Guide
 
-## 1. Initial Setup
+Follow these steps to get the application running on your local machine.
 
-### Prerequisites
+## 1. Prerequisites
 
--   **Node.js**: Version `20.19.2` or compatible.
--   **npm**: Included with Node.js.
--   **MySQL**: A running MySQL server instance.
+- **Node.js**: Version `20.x` or later.
+- **npm**: Included with Node.js.
+- **MySQL**: A running MySQL server instance.
 
-### Database
+## 2. Database Setup
 
-Execute the following SQL script in your MySQL client. This will create the database, all necessary tables with the correct structure, and optional sample data.
+You need to create a database and the required tables.
 
-#### 1. Create Database User (Required)
+### Create Database User
 
-First, ensure you have a MySQL user for the application.
+First, ensure you have a MySQL user for the application. Run this in your MySQL client:
 
 ```sql
 -- Create user 'admin' with a password.
@@ -113,9 +65,9 @@ GRANT ALL PRIVILEGES ON *.* TO 'admin'@'localhost' WITH GRANT OPTION;
 FLUSH PRIVILEGES;
 ```
 
-> **Note:** Remember to use these credentials in your `.env` file.
+> **Note:** Remember to use these credentials in your `.env` file later.
 
-#### 2. Create Database and Tables
+### Create Database and Tables
 
 This script sets up the entire database structure.
 
@@ -141,8 +93,8 @@ CREATE TABLE boats (
     boatId VARCHAR(255) NOT NULL UNIQUE,
     gateway_id VARCHAR(255), -- This links to gateways.gatewayId
     CONSTRAINT fk_gateway
-        FOREIGN KEY (gateway_id) 
-        REFERENCES gateways(gatewayId) 
+        FOREIGN KEY (gateway_id)
+        REFERENCES gateways(gatewayId)
         ON DELETE SET NULL
 );
 
@@ -183,22 +135,11 @@ CREATE TABLE command_logs (
   FOREIGN KEY (boat_id) REFERENCES boats(boatId) ON DELETE CASCADE,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
-
--- --- OPTIONAL SAMPLE DATA ---
-
--- Add a sample gateway
-INSERT INTO gateways (gatewayId, name, ip_address) VALUES ('GW001', 'Main Gateway', '192.168.1.100');
-
--- Add a sample boat and assign it to the gateway 'GW001'
-INSERT INTO boats (name, boatId, gateway_id) VALUES ('Boat 1', '00001', 'GW001');
-
--- Add another sample boat without an assigned gateway
-INSERT INTO boats (name, boatId) VALUES ('Boat 2', '00002');
 ```
 
-### Configuration
+## 3. Application Configuration
 
-Create a `.env` file in the project root with the following content. **This is a mandatory step.**
+Create a file named `.env` in the project root and add the following content. **This is a mandatory step.**
 
 ```
 # JWT Secret for signing authentication tokens
@@ -206,59 +147,73 @@ JWT_SECRET="your-super-secret-key-that-is-long-and-random"
 
 # MySQL Database Connection
 DB_HOST="localhost"
-DB_USER="your_db_user"      # e.g., admin
-DB_PASSWORD="your_db_password"  # e.g., password
+DB_USER="admin"
+DB_PASSWORD="password"
 DB_DATABASE="boat_db"
 ```
 
-### Install Dependencies
+> **Important**: Replace the database credentials with the ones you created in the previous step.
 
-In the project root, run:
+## 4. Install Dependencies
+
+Navigate to the project root directory in your terminal and run:
+
 ```bash
 npm install
 ```
 
-### Gateway Management
+## 5. Fog Server Integration
 
-Gateway IP addresses are no longer hard-coded. You must add and manage your gateways in the database. You can do this via a MySQL client or by building a UI for it. The sample data above shows how to add a gateway. The server will dynamically use the IP address from the `gateways` table when sending commands to a boat.
+**IMPORTANT NOTE**: The control command forwarding logic has been changed. Instead of dynamically looking up a gateway's IP address from the database, the server now sends all control commands to a single, hardcoded "Fog Server" address.
+
+- **Modified File**: `server.js`
+- **Function**: `forwardCommandToGateway`
+- **Current Endpoint**: This function sends a `POST` request to `http://localhost:10000/command`.
+
+This change was made to delegate the task of finding and communicating with the correct gateway to the Fog Server. If you need to change this target address, edit the `fogServerUrl` constant inside the `forwardCommandToGateway` function in `server.js`.
 
 ---
 
-## 2. Running the Application
+## 6. Running the Application
 
-### Development Environment
+### For Development
 
-Requires **2 separate terminals**.
+This mode is ideal for development, as it provides hot-reloading for the frontend. You will need **two separate terminals**.
 
 1.  **Run the Backend Server (Terminal 1):**
     Starts the API server on `http://localhost:3001`.
+
     ```bash
     node server.js
     ```
 
 2.  **Run the Frontend Server (Terminal 2):**
-    Starts the React development server on `http://localhost:3000` with hot-reloading.
+    Starts the React development server on `http://localhost:3000`.
+
     ```bash
     npm start
     ```
 
-3.  **Register & Log In:**
-    Before you can use the app, you must create a user account from the login page.
+3.  **Access the Application:**
+    Open your browser to **`http://localhost:3000`**. You will need to create a user account from the login page before you can use the application.
 
-**Open your browser to `http://localhost:3000` and log in.**
+### For Production
 
-### Production Environment
+This mode builds the frontend into optimized static files and serves everything from a single server instance.
 
 1.  **Build the Frontend:**
-    This bundles the React app into static files in the `build` directory.
+    This bundles the React app into the `build` directory.
+
     ```bash
     npm run build
     ```
 
 2.  **Run the Production Server:**
-    This single command serves both the API and the static frontend files.
+    This command serves both the API and the static frontend files.
+
     ```bash
     NODE_ENV=production node server.js
     ```
 
-**Open your browser to `http://localhost:3001` and log in.**
+3.  **Access the Application:**
+    Open your browser to **`http://localhost:3001`**.

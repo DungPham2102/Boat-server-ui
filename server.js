@@ -14,7 +14,6 @@ const port = 3001;
 app.use(cors());
 app.use(express.json());
 
-
 const db = mysql.createConnection({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -50,10 +49,10 @@ app.post("/api/register", async (req, res) => {
   try {
     const hashedPassword = await bcrypt.hash(password, saltRounds);
     const query = "INSERT INTO users (username, password) VALUES (?, ?)";
-    
+
     db.query(query, [username, hashedPassword], (err, result) => {
       if (err) {
-        if (err.code === 'ER_DUP_ENTRY') {
+        if (err.code === "ER_DUP_ENTRY") {
           return res.status(409).send("Username already exists.");
         }
         console.error("Error registering user:", err);
@@ -91,7 +90,11 @@ app.post("/api/login", (req, res) => {
     try {
       const isMatch = await bcrypt.compare(password, user.password);
       if (isMatch) {
-        const accessToken = jwt.sign({ username: user.username, id: user.id }, JWT_SECRET, { expiresIn: '1h' });
+        const accessToken = jwt.sign(
+          { username: user.username, id: user.id },
+          JWT_SECRET,
+          { expiresIn: "1h" }
+        );
         res.json({ accessToken });
       } else {
         res.status(401).send("Username or password incorrect.");
@@ -105,8 +108,8 @@ app.post("/api/login", (req, res) => {
 
 // Authentication Middleware
 const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Format: "Bearer TOKEN"
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1]; // Format: "Bearer TOKEN"
 
   if (token == null) {
     return res.status(401).send("A token is required for authentication");
@@ -146,7 +149,9 @@ app.get("/api/gateways", authenticateToken, (req, res) => {
 app.post("/api/gateways", authenticateToken, (req, res) => {
   const { name, gatewayId, ip_address } = req.body;
   if (!name || !gatewayId || !ip_address) {
-    return res.status(400).json({ error: "Name, Gateway ID, and IP Address are required." });
+    return res
+      .status(400)
+      .json({ error: "Name, Gateway ID, and IP Address are required." });
   }
 
   db.query(
@@ -155,12 +160,16 @@ app.post("/api/gateways", authenticateToken, (req, res) => {
     (err, results) => {
       if (err) {
         if (err.code === "ER_DUP_ENTRY") {
-          return res.status(409).json({ error: `Gateway with ID '${gatewayId}' already exists.` });
+          return res
+            .status(409)
+            .json({ error: `Gateway with ID '${gatewayId}' already exists.` });
         }
         console.error("Error inserting into database:", err);
         return res.status(500).json({ error: "Internal server error" });
       }
-      res.status(201).json({ id: results.insertId, name, gatewayId, ip_address });
+      res
+        .status(201)
+        .json({ id: results.insertId, name, gatewayId, ip_address });
     }
   );
 });
@@ -204,7 +213,14 @@ app.post("/api/boats", authenticateToken, (req, res) => {
         return res.status(500).json({ error: "Internal server error" });
       }
       // Return the full new boat object, including the gateway_id
-      res.status(201).json({ id: results.insertId, name, boatId, gateway_id: gatewayToSave });
+      res
+        .status(201)
+        .json({
+          id: results.insertId,
+          name,
+          boatId,
+          gateway_id: gatewayToSave,
+        });
     }
   );
 });
@@ -280,68 +296,44 @@ console.log(
 
 // This function forwards a command to the Raspberry Pi Gateway
 function forwardCommandToGateway(boatId, commandData) {
-  const gatewayPort = 5000; // Port for the Python server on the Gateway
+  const fogServerUrl = "http://localhost:10000/command"; // Hardcoded Fog Server URL
 
-  // 1. Find the gateway IP address for the given boatId
-  const query = `
-    SELECT g.ip_address
-    FROM boats AS b
-    JOIN gateways AS g ON b.gateway_id = g.gatewayId
-    WHERE b.boatId = ?
-  `;
+  console.log(
+    `Forwarding command for boat ${boatId} to Fog Server at ${fogServerUrl}`
+  );
 
-  db.query(query, [boatId], (err, results) => {
-    if (err) {
-      console.error(
-        `Database error while finding gateway for boat ${boatId}:`,
-        err
-      );
-      return;
-    }
+  // Send the command to the hardcoded Fog Server address
+  const postData = JSON.stringify(commandData);
 
-    if (results.length === 0) {
-      console.error(
-        `Could not find an assigned gateway for boat ${boatId}. Command not sent.`
-      );
-      return;
-    }
+  const parsedUrl = new URL(fogServerUrl);
 
-    const gatewayIp = results[0].ip_address;
-    console.log(
-      `Found gateway IP ${gatewayIp} for boat ${boatId}. Forwarding command...`
-    );
+  const options = {
+    hostname: parsedUrl.hostname,
+    port: parsedUrl.port,
+    path: parsedUrl.pathname,
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Content-Length": Buffer.byteLength(postData),
+    },
+  };
 
-    // 2. Send the command to the found IP address
-    const postData = JSON.stringify(commandData);
-
-    const options = {
-      hostname: gatewayIp,
-      port: gatewayPort,
-      path: "/command",
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Content-Length": Buffer.byteLength(postData),
-      },
-    };
-
-    const req = http.request(options, (res) => {
-      console.log(`GATEWAY RESPONSE STATUS: ${res.statusCode}`);
-      res.setEncoding("utf8");
-      res.on("data", (chunk) => {
-        console.log(`GATEWAY RESPONSE BODY: ${chunk}`);
-      });
+  const req = http.request(options, (res) => {
+    console.log(`FOG SERVER RESPONSE STATUS: ${res.statusCode}`);
+    res.setEncoding("utf8");
+    res.on("data", (chunk) => {
+      console.log(`FOG SERVER RESPONSE BODY: ${chunk}`);
     });
-
-    req.on("error", (e) => {
-      console.error(
-        `Error sending command to gateway at ${gatewayIp}: ${e.message}`
-      );
-    });
-
-    req.write(postData);
-    req.end();
   });
+
+  req.on("error", (e) => {
+    console.error(
+      `Error sending command to Fog Server at ${fogServerUrl}: ${e.message}`
+    );
+  });
+
+  req.write(postData);
+  req.end();
 }
 
 wss.on("connection", (ws, req) => {
@@ -366,7 +358,9 @@ wss.on("connection", (ws, req) => {
 
     // Attach user info to the WebSocket object for later use
     ws.user = user;
-    console.log(`WebSocket connection authenticated for user: ${user.username}`);
+    console.log(
+      `WebSocket connection authenticated for user: ${user.username}`
+    );
 
     // --- Original connection logic starts here ---
     const boatIdFromPath = pathname.substring(1);
@@ -413,24 +407,35 @@ wss.on("connection", (ws, req) => {
 
     // Handle subscriptions for real-time data
     if (boatIdFromPath === "all") {
-      console.log(`UI client (${ws.user.username}) connected, subscribing to ALL boats.`);
+      console.log(
+        `UI client (${ws.user.username}) connected, subscribing to ALL boats.`
+      );
       allBoatsSubscribers.add(ws);
       ws.on("close", () => {
-        console.log(`UI client (${ws.user.username}) for ALL boats disconnected.`);
+        console.log(
+          `UI client (${ws.user.username}) for ALL boats disconnected.`
+        );
         allBoatsSubscribers.delete(ws);
       });
       ws.on("error", (error) => {
-        console.error(`WebSocket error for 'all' subscriber (${ws.user.username}):`, error);
+        console.error(
+          `WebSocket error for 'all' subscriber (${ws.user.username}):`,
+          error
+        );
         allBoatsSubscribers.delete(ws);
       });
     } else if (boatIdFromPath) {
-      console.log(`UI client (${ws.user.username}) connected, subscribing to boat: ${boatIdFromPath}`);
+      console.log(
+        `UI client (${ws.user.username}) connected, subscribing to boat: ${boatIdFromPath}`
+      );
       if (!clientsByBoatId.has(boatIdFromPath)) {
         clientsByBoatId.set(boatIdFromPath, new Set());
       }
       clientsByBoatId.get(boatIdFromPath).add(ws);
       ws.on("close", () => {
-        console.log(`UI client (${ws.user.username}) for boat ${boatIdFromPath} disconnected`);
+        console.log(
+          `UI client (${ws.user.username}) for boat ${boatIdFromPath} disconnected`
+        );
         clientsByBoatId.get(boatIdFromPath).delete(ws);
       });
       ws.on("error", (error) => {
@@ -459,20 +464,16 @@ app.post("/api/telemetry", (req, res) => {
     return res.status(400).send("Invalid data format. Expected a JSON object.");
   }
 
-  const {
-    boatId,
-    lat,
-    lon,
-    head,
-    targetHead,
-    leftSpeed,
-    rightSpeed
-  } = data;
+  const { boatId, lat, lon, head, targetHead, leftSpeed, rightSpeed } = data;
 
   // Check for essential fields
   if (!boatId || lat === undefined || lon === undefined) {
-    console.log(`Invalid data format from source: ${JSON.stringify(data)}. Skipping.`);
-    return res.status(400).send("Invalid data format. Missing required fields.");
+    console.log(
+      `Invalid data format from source: ${JSON.stringify(data)}. Skipping.`
+    );
+    return res
+      .status(400)
+      .send("Invalid data format. Missing required fields.");
   }
 
   const receivedBoatId = boatId;
