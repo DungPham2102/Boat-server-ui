@@ -82,8 +82,7 @@ USE boat_db;
 CREATE TABLE gateways (
     id INT AUTO_INCREMENT PRIMARY KEY,
     gatewayId VARCHAR(255) NOT NULL UNIQUE,
-    name VARCHAR(255),
-    ip_address VARCHAR(255) NOT NULL
+    name VARCHAR(255)
 );
 
 -- Create the table for boats, with a foreign key to gateways

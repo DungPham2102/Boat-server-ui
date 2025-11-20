@@ -147,16 +147,16 @@ app.get("/api/gateways", authenticateToken, (req, res) => {
 
 // Add a new gateway
 app.post("/api/gateways", authenticateToken, (req, res) => {
-  const { name, gatewayId, ip_address } = req.body;
-  if (!name || !gatewayId || !ip_address) {
+  const { name, gatewayId } = req.body;
+  if (!name || !gatewayId) {
     return res
       .status(400)
-      .json({ error: "Name, Gateway ID, and IP Address are required." });
+      .json({ error: "Name and Gateway ID are required." });
   }
 
   db.query(
-    "INSERT INTO gateways (name, gatewayId, ip_address) VALUES (?, ?, ?)",
-    [name, gatewayId, ip_address],
+    "INSERT INTO gateways (name, gatewayId) VALUES (?, ?)",
+    [name, gatewayId],
     (err, results) => {
       if (err) {
         if (err.code === "ER_DUP_ENTRY") {
@@ -169,7 +169,7 @@ app.post("/api/gateways", authenticateToken, (req, res) => {
       }
       res
         .status(201)
-        .json({ id: results.insertId, name, gatewayId, ip_address });
+        .json({ id: results.insertId, name, gatewayId });
     }
   );
 });

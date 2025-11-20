@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 
 function GatewayManager({ serverIp, token, gateways, setGateways }) {
-  const [formData, setFormData] = useState({ name: "", gatewayId: "", ip_address: "" });
+  const [formData, setFormData] = useState({ name: "", gatewayId: "" });
   const [notification, setNotification] = useState({ type: "", message: "" });
 
   const getAuthHeaders = () => ({
@@ -34,7 +34,7 @@ function GatewayManager({ serverIp, token, gateways, setGateways }) {
       })
       .then((newGateway) => {
         setGateways([...gateways, newGateway]);
-        setFormData({ name: "", gatewayId: "", ip_address: "" });
+        setFormData({ name: "", gatewayId: "" });
         showNotification("success", "Gateway added successfully!");
       })
       .catch(error => {
@@ -90,14 +90,7 @@ function GatewayManager({ serverIp, token, gateways, setGateways }) {
           onChange={handleInputChange}
           required
         />
-        <input
-          type="text"
-          name="ip_address"
-          placeholder="IP Address"
-          value={formData.ip_address}
-          onChange={handleInputChange}
-          required
-        />
+        
         <button type="submit">Add Gateway</button>
       </form>
       {notification.message && (
@@ -110,7 +103,6 @@ function GatewayManager({ serverIp, token, gateways, setGateways }) {
           <tr>
             <th>Name</th>
             <th>Gateway ID</th>
-            <th>IP Address</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -119,7 +111,6 @@ function GatewayManager({ serverIp, token, gateways, setGateways }) {
             <tr key={gw.id}>
               <td>{gw.name}</td>
               <td>{gw.gatewayId}</td>
-              <td>{gw.ip_address}</td>
               <td className="boat-manager-actions">
                 <button onClick={() => handleDelete(gw.id)}>Delete</button>
               </td>
